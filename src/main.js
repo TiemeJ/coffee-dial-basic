@@ -659,8 +659,7 @@ function renderPanelEdit(recipe) {
         <form id="form-method" class="edit-form">
           <details class="edit-section">
             <summary class="edit-section-head">
-              <span class="edit-section-icon">☕</span>
-              <span class="edit-section-label">${escapeHtml(displayName(recipe).toUpperCase())}</span>
+              <span class="edit-section-label">Coffee</span>
               <span class="edit-section-chevron">▾</span>
             </summary>
             <div class="edit-section-body">
@@ -700,9 +699,8 @@ function renderPanelEdit(recipe) {
             </div>
           </details>
 
-          <details class="edit-section" open>
+          <details class="edit-section">
             <summary class="edit-section-head">
-              <span class="edit-section-icon">⚗</span>
               <span class="edit-section-label">Extraction</span>
               <span class="edit-section-chevron">▾</span>
             </summary>
@@ -762,9 +760,8 @@ function renderPanelEdit(recipe) {
             </div>
           </details>
 
-          <details class="edit-section" open>
+          <details class="edit-section">
             <summary class="edit-section-head">
-              <span class="edit-section-icon">☕</span>
               <span class="edit-section-label">Cupping</span>
               <span class="edit-section-chevron">▾</span>
             </summary>
@@ -785,7 +782,6 @@ function renderPanelEdit(recipe) {
           </details>
 
           <footer class="edit-footer">
-            ${!isNewDrink && methodName && drinkName ? '<button type="button" class="edit-footer-link danger" id="btn-delete-drink">Delete drink</button>' : '<span></span>'}
             <div class="edit-footer-actions">
               <button type="button" class="edit-footer-discard" id="btn-discard">Discard</button>
               <button type="submit" class="btn btn-save">
