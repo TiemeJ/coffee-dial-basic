@@ -1,0 +1,32 @@
+{
+  "name": "Coffee Dial",
+  "short_name": "Coffee Dial",
+  "description": "Your best coffee recipes, always at hand.",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "background_color": "#1c1917",
+  "theme_color": "#292524",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./images/coffee-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./images/coffee-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./images/coffee-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
