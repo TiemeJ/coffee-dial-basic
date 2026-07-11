@@ -198,7 +198,8 @@ function renderLogin() {
 }
 
 function renderBrandIcon() {
-  return `<img src="/images/coffee-icon.png" alt="" class="brand-icon" width="28" height="28" />`;
+  const iconUrl = `${import.meta.env.BASE_URL}images/coffee-icon.png`;
+  return `<img src="${iconUrl}" alt="" class="brand-icon" width="28" height="28" />`;
 }
 
 function renderShell(content) {
