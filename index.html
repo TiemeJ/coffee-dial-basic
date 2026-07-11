@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coffee Dial</title>
+    <link rel="stylesheet" href="/vendor/css/outfit.css" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <p style="color: #a89888; text-align: center; padding: 4rem 1.5rem; font-family: system-ui, sans-serif">
+        Loading Coffee Dial…
+      </p>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      window.addEventListener('error', function () {
+        var app = document.getElementById('app');
+        if (app && app.textContent.indexOf('Loading') !== -1) {
+          app.innerHTML =
+            '<div style="color:#f5efe8;text-align:center;padding:4rem 1.5rem;font-family:system-ui,sans-serif;max-width:420px;margin:0 auto">' +
+            '<p style="font-size:1.25rem;font-weight:600;margin-bottom:0.75rem">Could not start the app</p>' +
+            '<p style="color:#a89888;line-height:1.6">Do not use <strong>Go Live</strong>. Run <code style="background:#3d2b1f;padding:0.15rem 0.4rem;border-radius:4px">npm run dev</code> in the project folder instead.</p>' +
+            '</div>';
+        }
+      });
+    </script>
+  </body>
+</html>
