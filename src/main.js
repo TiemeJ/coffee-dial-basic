@@ -53,7 +53,7 @@ import {
   isPinChecked,
 } from './utils.js';
 
-const TILE_BG_COUNT = 5;
+const TILE_BG_COUNT = 6;
 
 const app = document.getElementById('app');
 
