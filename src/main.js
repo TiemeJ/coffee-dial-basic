@@ -390,7 +390,6 @@ function bindPinFlow() {
   }
 
   pinSearchInput?.addEventListener('input', filterPinCoffeeList);
-  pinSearchInput?.focus();
 
   document.querySelectorAll('[data-pin-recipe]').forEach((btn) => {
     btn.addEventListener('click', () => {
