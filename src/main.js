@@ -657,7 +657,7 @@ function renderPanelEdit(recipe) {
         </header>
 
         <form id="form-method" class="edit-form">
-          <details class="edit-section" open>
+          <details class="edit-section">
             <summary class="edit-section-head">
               <span class="edit-section-icon">☕</span>
               <span class="edit-section-label">${escapeHtml(displayName(recipe).toUpperCase())}</span>
@@ -707,17 +707,17 @@ function renderPanelEdit(recipe) {
               <span class="edit-section-chevron">▾</span>
             </summary>
             <div class="edit-section-body">
-              <div class="edit-grid-2">
-                ${renderPresetField({
-                  label: 'Brewing method',
-                  presetName: 'methodPreset',
-                  customName: 'methodCustom',
-                  readonlyName: 'methodName',
-                  options: BREWING_METHODS,
-                  value: methodName,
-                  placeholder: 'Select method',
-                  editable: isMethodEditable,
-                })}
+              ${renderPresetField({
+                label: 'Brewing method',
+                presetName: 'methodPreset',
+                customName: 'methodCustom',
+                readonlyName: 'methodName',
+                options: BREWING_METHODS,
+                value: methodName,
+                placeholder: 'Select method',
+                editable: isMethodEditable,
+              })}
+              <div class="edit-grid-inline-2 edit-grid-spaced">
                 ${renderPresetField({
                   label: 'Drink',
                   presetName: 'drinkPreset',
@@ -728,12 +728,12 @@ function renderPanelEdit(recipe) {
                   placeholder: 'Select drink',
                   editable: isNewDrink,
                 })}
-              </div>
-              <div class="edit-grid-3 edit-grid-spaced">
                 <label class="edit-field">
                   <span>Gear</span>
                   <input type="text" name="gear" value="${escapeHtml(String(data.gear || ''))}" placeholder="DF64" />
                 </label>
+              </div>
+              <div class="edit-grid-inline-3 edit-grid-spaced">
                 <label class="edit-field">
                   <span>Grind size</span>
                   <input type="text" name="grind" value="${escapeHtml(String(data.grind || ''))}" placeholder="12" inputmode="decimal" />
@@ -741,6 +741,10 @@ function renderPanelEdit(recipe) {
                 <label class="edit-field">
                   <span>Temp</span>
                   <input type="text" name="temp" value="${escapeHtml(String(data.temp || ''))}" placeholder="L4" />
+                </label>
+                <label class="edit-field">
+                  <span>Time (sec)</span>
+                  <input type="text" name="time" value="${escapeHtml(String(data.time || ''))}" placeholder="20" inputmode="decimal" />
                 </label>
               </div>
               <div class="dose-row">
@@ -755,10 +759,6 @@ function renderPanelEdit(recipe) {
                 </label>
               </div>
               <input type="hidden" name="ratio" id="input-ratio" value="${escapeHtml(computeRatio(data.dose, data.out) || String(data.ratio || ''))}" />
-              <label class="edit-field edit-field-narrow">
-                <span>Time (sec)</span>
-                <input type="text" name="time" value="${escapeHtml(String(data.time || ''))}" placeholder="20" inputmode="decimal" />
-              </label>
             </div>
           </details>
 
@@ -769,14 +769,14 @@ function renderPanelEdit(recipe) {
               <span class="edit-section-chevron">▾</span>
             </summary>
             <div class="edit-section-body">
-              <label class="edit-field">
-                <span>Tasting notes</span>
-                <textarea name="notes" rows="3" placeholder="Funky strawberries, tropical fruit">${escapeHtml(String(data.notes || ''))}</textarea>
-              </label>
               <div class="edit-field">
                 <span>Rating</span>
                 ${renderStarPicker(data.rating)}
               </div>
+              <label class="edit-field">
+                <span>Tasting notes</span>
+                <textarea name="notes" rows="3" placeholder="Funky strawberries, tropical fruit">${escapeHtml(String(data.notes || ''))}</textarea>
+              </label>
               <label class="edit-field">
                 <span>Improve</span>
                 <textarea name="improve" rows="2" placeholder="Maybe a bit hotter">${escapeHtml(String(data.improve || ''))}</textarea>
@@ -883,16 +883,16 @@ function renderAddForm() {
             <span class="edit-section-chevron">▾</span>
           </summary>
           <div class="edit-section-body">
-            <div class="edit-grid-2">
-              ${renderPresetField({
-                label: 'Brewing method',
-                presetName: 'methodPreset',
-                customName: 'methodCustom',
-                options: BREWING_METHODS,
-                value: '',
-                placeholder: 'Select method',
-                editable: true,
-              })}
+            ${renderPresetField({
+              label: 'Brewing method',
+              presetName: 'methodPreset',
+              customName: 'methodCustom',
+              options: BREWING_METHODS,
+              value: '',
+              placeholder: 'Select method',
+              editable: true,
+            })}
+            <div class="edit-grid-inline-2 edit-grid-spaced">
               ${renderPresetField({
                 label: 'Drink',
                 presetName: 'drinkPreset',
@@ -902,14 +902,12 @@ function renderAddForm() {
                 placeholder: 'Select drink',
                 editable: true,
               })}
-            </div>
-            <div class="edit-grid-spaced">
               <label class="edit-field">
                 <span>Gear</span>
                 <input type="text" name="gear" placeholder="DF64" />
               </label>
             </div>
-            <div class="edit-grid-2 edit-grid-spaced">
+            <div class="edit-grid-inline-3 edit-grid-spaced">
               <label class="edit-field">
                 <span>Grind size</span>
                 <input type="text" name="grind" placeholder="12" inputmode="decimal" />
@@ -917,6 +915,10 @@ function renderAddForm() {
               <label class="edit-field">
                 <span>Temp</span>
                 <input type="text" name="temp" placeholder="L4" />
+              </label>
+              <label class="edit-field">
+                <span>Time (sec)</span>
+                <input type="text" name="time" placeholder="20" inputmode="decimal" />
               </label>
             </div>
             <div class="dose-row">
@@ -930,10 +932,6 @@ function renderAddForm() {
                 <input type="text" name="out" id="add-out" placeholder="40" inputmode="decimal" />
               </label>
             </div>
-            <label class="edit-field edit-field-narrow">
-              <span>Time (sec)</span>
-              <input type="text" name="time" placeholder="20" inputmode="decimal" />
-            </label>
           </div>
         </details>
 
@@ -944,14 +942,14 @@ function renderAddForm() {
             <span class="edit-section-chevron">▾</span>
           </summary>
           <div class="edit-section-body">
-            <label class="edit-field">
-              <span>Tasting notes</span>
-              <textarea name="notes" rows="3" placeholder="Funky strawberries, tropical fruit"></textarea>
-            </label>
             <div class="edit-field">
               <span>Rating</span>
               ${renderStarPicker('')}
             </div>
+            <label class="edit-field">
+              <span>Tasting notes</span>
+              <textarea name="notes" rows="3" placeholder="Funky strawberries, tropical fruit"></textarea>
+            </label>
             <label class="edit-field">
               <span>Improve</span>
               <textarea name="improve" rows="2" placeholder="Maybe a bit hotter"></textarea>

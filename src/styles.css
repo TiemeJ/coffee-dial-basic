@@ -1155,6 +1155,18 @@ input {
   margin-top: 0.75rem;
 }
 
+.edit-grid-inline-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.edit-grid-inline-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
 .edit-field {
   display: flex;
   flex-direction: column;
@@ -1866,6 +1878,22 @@ input {
   .edit-grid-3,
   .edit-grid-2 {
     grid-template-columns: 1fr;
+  }
+
+  .edit-grid-inline-2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .edit-grid-inline-3 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+  }
+
+  .edit-grid-inline-2 .edit-field input,
+  .edit-grid-inline-2 .edit-field select,
+  .edit-grid-inline-3 .edit-field input {
+    padding: 0.5rem 0.45rem;
   }
 
   .edit-field input,
