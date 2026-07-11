@@ -241,7 +241,10 @@ input {
   overflow: hidden;
   text-align: left;
   scroll-snap-align: start;
-  background: var(--tile-pinned);
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  background: var(--bg-header);
   border: 1px solid rgba(0, 0, 0, 0.15);
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
@@ -252,14 +255,33 @@ input {
   border-color: rgba(0, 0, 0, 0.25);
 }
 
-.tile-body {
-  padding: 0.85rem 1rem;
-  position: relative;
-  z-index: 1;
-  min-height: 100%;
+.tile-header {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.tile-pattern {
+  flex: 2;
+  min-width: 0;
+  background-color: var(--tile-pinned);
+  background-repeat: repeat;
+  background-size: 240px auto;
+  background-position: center;
+  position: relative;
+}
+
+.tile-pattern::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1);
+  pointer-events: none;
 }
 
 .tile-name {
@@ -267,6 +289,9 @@ input {
   font-weight: 700;
   line-height: 1.25;
   color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tile-sub,
@@ -275,6 +300,9 @@ input {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.78);
   margin-top: 0.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Pin coffee flow */
@@ -1698,12 +1726,12 @@ input {
   .tile {
     flex: none;
     width: 100%;
-    height: auto;
-    min-height: 88px;
+    height: 112px;
+    min-height: 112px;
   }
 
-  .tile-body {
-    padding: 0.9rem 1rem;
+  .tile-header {
+    padding: 0.75rem 0.85rem;
   }
 
   .tile-name {
