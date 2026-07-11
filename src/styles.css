@@ -45,6 +45,9 @@ body {
   color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 #app {
@@ -1613,40 +1616,350 @@ input {
 }
 
 @media (max-width: 600px) {
+  .login {
+    padding: 1.5rem 1.25rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+
+  .login-card h1 {
+    font-size: 1.65rem;
+  }
+
+  .login-tagline {
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-google {
+    width: 100%;
+    justify-content: center;
+    padding: 0.85rem 1.25rem;
+  }
+
   .header {
-    padding: 0.75rem 1rem;
+    padding: 0.65rem 0.85rem;
+    padding-top: calc(0.65rem + env(safe-area-inset-top));
+    gap: 0.5rem;
+  }
+
+  .brand {
+    font-size: 1rem;
+    min-width: 0;
+  }
+
+  .brand-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .btn-pin-header {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.72rem;
+  }
+
+  .btn-icon,
+  .avatar,
+  .avatar-fallback {
+    width: 40px;
+    height: 40px;
   }
 
   .main {
-    padding: 1.25rem 1rem;
+    padding: 1rem 0.85rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .tiles {
+    flex-direction: column;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    gap: 0.65rem;
+    padding-bottom: 0.5rem;
   }
 
   .tile {
-    flex: 0 0 240px;
-    height: 112px;
+    flex: none;
+    width: 100%;
+    height: auto;
+    min-height: 88px;
   }
 
+  .tile-body {
+    padding: 0.9rem 1rem;
+  }
+
+  .tile-name {
+    font-size: 1rem;
+  }
+
+  .empty {
+    padding: 2.5rem 1rem;
+  }
+
+  .empty p {
+    font-size: 1rem;
+  }
+
+  /* Bottom-sheet modals */
   .panel-backdrop {
     padding: 0;
     align-items: flex-end;
   }
 
-  .recipe-panel {
-    max-height: 92vh;
-    border-radius: 20px 20px 0 0;
+  .recipe-panel,
+  .pin-panel {
     max-width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 0.85rem 1rem 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .edit-grid-3 {
-    grid-template-columns: 1fr;
+  .recipe-panel-view {
+    min-height: 0;
+    max-height: 92dvh;
   }
 
-  .edit-grid-2 {
-    grid-template-columns: 1fr;
+  .recipe-panel-edit {
+    max-width: 100%;
+    max-height: 94dvh;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .panel-header-compact {
+    min-height: auto;
+  }
+
+  .panel-title {
+    font-size: 1.1rem;
+    word-break: break-word;
+  }
+
+  .panel-farmer {
+    font-size: 0.82rem;
+  }
+
+  .panel-action-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .panel-menu {
+    min-width: 180px;
+  }
+
+  .panel-menu button {
+    padding: 0.75rem 1rem;
+    min-height: 44px;
+  }
+
+  .method-tab {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .drink-tab {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .brew-stats {
+    padding: 0.75rem 0.65rem;
   }
 
   .stat-cards {
     grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+  }
+
+  .stat-card {
+    padding: 0.55rem 0.25rem;
+    min-height: 58px;
+  }
+
+  .stat-label {
+    font-size: 0.58rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 0.92rem;
+  }
+
+  .stat-card-temp .stat-value,
+  .temp-badge {
+    font-size: 0.85rem;
+  }
+
+  .note-boxes {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .note-box-body {
+    font-size: 0.82rem;
+  }
+
+  .panel-nav-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pin-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .pin-hint {
+    font-size: 0.8rem;
+  }
+
+  .pin-list-main {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .pin-list-delete,
+  .pin-delete-drink {
+    min-width: 52px;
+    font-size: 0.68rem;
+  }
+
+  .pin-check {
+    padding: 0.65rem 0.75rem;
+    min-height: 44px;
+  }
+
+  .pin-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .pin-footer .edit-footer-discard,
+  .pin-footer .btn-save {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Edit / add forms */
+  .edit-topbar {
+    padding: 0.85rem 1rem 0.65rem;
+  }
+
+  .edit-topbar-title {
+    font-size: 0.95rem;
+  }
+
+  .edit-form {
+    padding: 0.5rem 1rem 1rem;
+  }
+
+  .edit-grid-3,
+  .edit-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-field input,
+  .edit-field textarea,
+  .edit-field select,
+  .edit-select {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  .edit-field-narrow {
+    max-width: none;
+  }
+
+  .dose-row {
+    gap: 0.35rem;
+    padding: 0.65rem;
+  }
+
+  .dose-field input {
+    font-size: 1rem;
+  }
+
+  .ratio-display {
+    font-size: 0.85rem;
+    padding-bottom: 0.45rem;
+  }
+
+  .edit-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom));
+  }
+
+  .edit-footer-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .edit-footer-link {
+    text-align: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-save {
+    min-height: 44px;
+  }
+
+  .add-page {
+    max-width: none;
+  }
+
+  .add-topbar {
+    margin-bottom: 1rem;
+  }
+
+  .add-topbar-spacer {
+    width: 44px;
+  }
+
+  .add-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  .add-footer .btn-save,
+  .add-footer .edit-footer-discard {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .scope-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .scope-dialog {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 1.15rem 1.15rem 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .scope-actions .btn {
+    min-height: 44px;
   }
 
   .detail-actions {
@@ -1656,5 +1969,25 @@ input {
   .detail-actions .btn {
     width: 100%;
     text-align: center;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 380px) {
+  .brand-text {
+    max-width: 6.5rem;
+  }
+
+  .btn-pin-header {
+    font-size: 0.68rem;
+    padding: 0.4rem 0.55rem;
+  }
+
+  .stat-cards {
+    gap: 0.3rem;
+  }
+
+  .stat-value {
+    font-size: 0.85rem;
   }
 }
