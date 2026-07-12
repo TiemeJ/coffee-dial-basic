@@ -9,6 +9,8 @@ import {
   deleteRecipe,
   appendDrinkToRecipe,
   ensureUserDoc,
+  fetchHomeOrder,
+  saveHomeOrder,
 } from './api.js';
 import {
   displayName,
@@ -46,6 +48,7 @@ import {
   isDecafCoffee,
   hasActivePin,
   isOnHomeScreen,
+  applyHomeOrder,
   getPinnedPairs,
   visibleMethodNames,
   visibleDrinkNames,
@@ -61,6 +64,7 @@ const app = document.getElementById('app');
 let currentUser = null;
 let recipes = [];
 let allRecipes = [];
+let homeOrder = [];
 let beanTemplates = [];
 let view = { name: 'home', panel: null, pinFlow: null };
 
@@ -73,6 +77,7 @@ onAuthChange(async (user) => {
   } else {
     recipes = [];
     allRecipes = [];
+    homeOrder = [];
     view = { name: 'home', panel: null, pinFlow: null };
     render();
   }
@@ -80,8 +85,23 @@ onAuthChange(async (user) => {
 
 async function loadRecipes() {
   if (!currentUser) return;
-  allRecipes = await fetchAllRecipes(currentUser.uid);
-  recipes = allRecipes.filter(isOnHomeScreen);
+  const [all, order] = await Promise.all([
+    fetchAllRecipes(currentUser.uid),
+    fetchHomeOrder(currentUser.uid),
+  ]);
+  allRecipes = all;
+  homeOrder = order;
+  refreshHomeRecipes();
+}
+
+function refreshHomeRecipes() {
+  recipes = applyHomeOrder(allRecipes.filter(isOnHomeScreen), homeOrder);
+}
+
+async function persistHomeOrder() {
+  if (!currentUser) return;
+  homeOrder = recipes.map((r) => r.id);
+  await saveHomeOrder(currentUser.uid, homeOrder);
 }
 
 function getRecipe(id) {
@@ -237,7 +257,7 @@ function renderCoffeeTile(r, index = 0) {
     ? `<img src="${import.meta.env.BASE_URL}images/decaf_light.png" alt="Decaf" class="tile-decaf-icon" width="18" height="18" />`
     : '';
   return `
-    <button type="button" class="tile" data-id="${escapeHtml(r.id)}">
+    <button type="button" class="tile" data-id="${escapeHtml(r.id)}" draggable="true">
       <div class="tile-header">
         <h2 class="tile-name">${escapeHtml(displayName(r))}</h2>
         ${displaySubtitle(r) ? `<p class="tile-sub">${escapeHtml(displaySubtitle(r))}</p>` : ''}
@@ -249,7 +269,7 @@ function renderCoffeeTile(r, index = 0) {
 
 function renderHome() {
   const tiles = recipes.map((r, index) => renderCoffeeTile(r, index)).join('');
-  return `<div class="tiles">${tiles}</div>`;
+  return `<div class="tiles" id="tiles-list">${tiles}</div>`;
 }
 
 function recipeSearchText(recipe) {
@@ -1046,18 +1066,109 @@ function bindShell() {
 
 function bindHome() {
   document.getElementById('btn-add-empty')?.addEventListener('click', () => openAddView());
+  bindTileReorder();
+
   document.querySelectorAll('.tile').forEach((el) => {
     el.addEventListener('click', async () => {
+      if (el.dataset.suppressClick === '1') {
+        delete el.dataset.suppressClick;
+        return;
+      }
       const id = el.dataset.id;
       const fresh = await fetchRecipe(currentUser.uid, id);
       if (fresh) {
         const allIdx = allRecipes.findIndex((r) => r.id === id);
         if (allIdx >= 0) allRecipes[allIdx] = fresh;
         else allRecipes.push(fresh);
-        recipes = allRecipes.filter(isOnHomeScreen);
+        refreshHomeRecipes();
       }
       openPanel(id);
       render();
+    });
+  });
+}
+
+function syncRecipesOrderFromDom(container) {
+  const ids = [...container.querySelectorAll('.tile')].map((el) => el.dataset.id);
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  recipes = ids.map((id) => byId.get(id)).filter(Boolean);
+  persistHomeOrder().catch(console.error);
+}
+
+function bindTileReorder() {
+  const container = document.getElementById('tiles-list');
+  if (!container || recipes.length < 2) return;
+
+  let draggedEl = null;
+  let touchEl = null;
+
+  const isVertical = () => window.matchMedia('(max-width: 600px)').matches;
+
+  const insertDraggedBefore = (target, pointerBefore) => {
+    if (!draggedEl || !target || draggedEl === target) return;
+    if (pointerBefore) container.insertBefore(draggedEl, target);
+    else container.insertBefore(draggedEl, target.nextSibling);
+  };
+
+  container.querySelectorAll('.tile').forEach((tile) => {
+    tile.addEventListener('dragstart', (e) => {
+      draggedEl = tile;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tile.dataset.id);
+      requestAnimationFrame(() => tile.classList.add('tile-dragging'));
+    });
+
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('tile-dragging');
+      if (draggedEl) {
+        syncRecipesOrderFromDom(container);
+        draggedEl.dataset.suppressClick = '1';
+        draggedEl = null;
+      }
+    });
+
+    tile.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!draggedEl || draggedEl === tile) return;
+      e.dataTransfer.dropEffect = 'move';
+      const rect = tile.getBoundingClientRect();
+      const before = isVertical()
+        ? e.clientY < rect.top + rect.height / 2
+        : e.clientX < rect.left + rect.width / 2;
+      insertDraggedBefore(tile, before);
+    });
+
+    tile.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      touchEl = tile;
+      tile.classList.add('tile-dragging');
+    }, { passive: true });
+
+    tile.addEventListener('touchmove', (e) => {
+      if (!touchEl || touchEl !== tile) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const target = document.elementFromPoint(t.clientX, t.clientY)?.closest('.tile');
+      if (!target || !container.contains(target)) return;
+      draggedEl = touchEl;
+      const rect = target.getBoundingClientRect();
+      const before = t.clientY < rect.top + rect.height / 2;
+      insertDraggedBefore(target, before);
+    }, { passive: false });
+
+    tile.addEventListener('touchend', () => {
+      if (!touchEl) return;
+      touchEl.classList.remove('tile-dragging');
+      syncRecipesOrderFromDom(container);
+      touchEl.dataset.suppressClick = '1';
+      touchEl = null;
+      draggedEl = null;
+    });
+
+    tile.addEventListener('touchcancel', () => {
+      touchEl?.classList.remove('tile-dragging');
+      touchEl = null;
+      draggedEl = null;
     });
   });
 }
@@ -1341,7 +1452,7 @@ function bindPanelEdit(recipe) {
         ...coffeeUpdates,
       };
     }
-    recipes = allRecipes.filter(isOnHomeScreen);
+    refreshHomeRecipes();
 
     view.panel.methodName = methodName;
     view.panel.drinkName = drinkName;
@@ -1470,9 +1581,10 @@ function bindAddForm() {
         drinkName,
         drinkParams
       );
-      const idx = recipes.findIndex((r) => r.id === existing.id);
-      if (idx >= 0) recipes[idx] = updated;
-      else recipes.unshift(updated);
+      const allIdx = allRecipes.findIndex((r) => r.id === existing.id);
+      if (allIdx >= 0) allRecipes[allIdx] = updated;
+      else allRecipes.unshift(updated);
+      refreshHomeRecipes();
 
       view = { name: 'home', panel: null };
       openPanel(updated.id, methodName, drinkName);
@@ -1486,7 +1598,10 @@ function bindAddForm() {
     }
 
     const created = await createRecipe(currentUser.uid, { ...beanData, methods });
-    recipes.unshift(created);
+    allRecipes.unshift(created);
+    homeOrder = [created.id, ...homeOrder.filter((id) => id !== created.id)];
+    await persistHomeOrder();
+    refreshHomeRecipes();
     view = { name: 'home', panel: null };
     openPanel(created.id, methodName || null, drinkName || null);
     render();

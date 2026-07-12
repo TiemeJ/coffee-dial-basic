@@ -257,6 +257,21 @@ export function isOnHomeScreen(recipe) {
   return hasActivePin(recipe) || recipe.isOpen !== false;
 }
 
+export function applyHomeOrder(recipes, order) {
+  if (!Array.isArray(order) || !order.length) return recipes;
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  const sorted = [];
+  for (const id of order) {
+    const recipe = byId.get(id);
+    if (recipe) {
+      sorted.push(recipe);
+      byId.delete(id);
+    }
+  }
+  const rest = [...byId.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return [...sorted, ...rest];
+}
+
 export function getPinnedPairs(recipe) {
   const pairs = [];
   const pinned = recipe?.pin?.methods;

@@ -247,6 +247,20 @@ input {
   background: var(--bg-header);
   border: 1px solid rgba(0, 0, 0, 0.15);
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  cursor: grab;
+  -webkit-user-drag: element;
+  user-select: none;
+}
+
+.tile:active {
+  cursor: grabbing;
+}
+
+.tile.tile-dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .tile:hover {
@@ -1732,6 +1746,10 @@ input {
     scroll-snap-type: none;
     gap: 0.65rem;
     padding-bottom: 0.5rem;
+  }
+
+  .tile.tile-dragging {
+    touch-action: none;
   }
 
   .tile {

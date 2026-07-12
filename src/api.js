@@ -106,6 +106,17 @@ export async function ensureUserDoc(uid, displayName) {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) {
-    await setDoc(userRef, { displayName: displayName || '', isPublic: false });
+    await setDoc(userRef, { displayName: displayName || '', isPublic: false, homeOrder: [] });
   }
+}
+
+export async function fetchHomeOrder(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists()) return [];
+  const order = snap.data().homeOrder;
+  return Array.isArray(order) ? order : [];
+}
+
+export async function saveHomeOrder(uid, order) {
+  await setDoc(doc(db, 'users', uid), { homeOrder: order }, { merge: true });
 }
