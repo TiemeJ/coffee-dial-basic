@@ -1163,6 +1163,49 @@ function syncRecipesOrderFromDom(container) {
   persistHomeOrder().catch(console.error);
 }
 
+const TILE_FLIP_TRANSITION = 'transform 0.38s cubic-bezier(0.34, 1.45, 0.64, 1)';
+const DRAG_GHOST = new Image();
+DRAG_GHOST.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+function clearTileMotionStyles(container) {
+  container.querySelectorAll('.tile').forEach((tile) => {
+    tile.classList.remove('tile-moving');
+    tile.style.transition = '';
+    tile.style.transform = '';
+  });
+}
+
+function flipReorderTiles(container, mutateDom) {
+  const tiles = [...container.querySelectorAll('.tile')];
+  const beforeRects = new Map(tiles.map((tile) => [tile, tile.getBoundingClientRect()]));
+
+  mutateDom();
+
+  requestAnimationFrame(() => {
+    tiles.forEach((tile) => {
+      if (!container.contains(tile)) return;
+      const first = beforeRects.get(tile);
+      if (!first) return;
+      const last = tile.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+      tile.style.transition = 'none';
+      tile.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    });
+
+    container.getBoundingClientRect();
+
+    tiles.forEach((tile) => {
+      if (!tile.style.transform) return;
+      tile.classList.add('tile-moving');
+      tile.style.transition = TILE_FLIP_TRANSITION;
+      tile.style.transform = '';
+    });
+  });
+}
+
 function bindTileReorder() {
   const container = document.getElementById('tiles-list');
   if (!container || !view.reorderMode || recipes.length < 2) return;
@@ -1174,11 +1217,26 @@ function bindTileReorder() {
 
   const insertDraggedBefore = (target, pointerBefore) => {
     if (!draggedEl || !target || draggedEl === target) return;
-    if (pointerBefore) container.insertBefore(draggedEl, target);
-    else container.insertBefore(draggedEl, target.nextSibling);
+    const shouldMove = pointerBefore
+      ? draggedEl.nextElementSibling !== target
+      : target.nextElementSibling !== draggedEl;
+    if (!shouldMove) return;
+    flipReorderTiles(container, () => {
+      if (pointerBefore) container.insertBefore(draggedEl, target);
+      else container.insertBefore(draggedEl, target.nextSibling);
+    });
   };
 
   container.querySelectorAll('.tile').forEach((tile) => {
+    tile.addEventListener('transitionend', (e) => {
+      if (e.propertyName !== 'transform' || !tile.classList.contains('tile-moving')) return;
+      tile.classList.remove('tile-moving');
+      if (!tile.classList.contains('tile-dragging')) {
+        tile.style.transition = '';
+        tile.style.transform = '';
+      }
+    });
+
     tile.addEventListener('dragstart', (e) => {
       if (!view.reorderMode) {
         e.preventDefault();
@@ -1187,11 +1245,13 @@ function bindTileReorder() {
       draggedEl = tile;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', tile.dataset.id);
+      e.dataTransfer.setDragImage(DRAG_GHOST, 0, 0);
       requestAnimationFrame(() => tile.classList.add('tile-dragging'));
     });
 
     tile.addEventListener('dragend', () => {
       tile.classList.remove('tile-dragging');
+      clearTileMotionStyles(container);
       if (draggedEl) {
         syncRecipesOrderFromDom(container);
         draggedEl.dataset.suppressClick = '1';
@@ -1232,6 +1292,7 @@ function bindTileReorder() {
     tile.addEventListener('touchend', () => {
       if (!touchEl) return;
       touchEl.classList.remove('tile-dragging');
+      clearTileMotionStyles(container);
       syncRecipesOrderFromDom(container);
       touchEl.dataset.suppressClick = '1';
       touchEl = null;
@@ -1240,6 +1301,7 @@ function bindTileReorder() {
 
     tile.addEventListener('touchcancel', () => {
       touchEl?.classList.remove('tile-dragging');
+      clearTileMotionStyles(container);
       touchEl = null;
       draggedEl = null;
     });

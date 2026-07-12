@@ -246,13 +246,29 @@ input {
   padding: 0;
   background: var(--bg-header);
   border: 1px solid rgba(0, 0, 0, 0.15);
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, scale 0.25s ease, rotate 0.25s ease;
 }
 
 .tiles-reorder-mode .tile {
+  will-change: transform;
   cursor: grab;
   -webkit-user-drag: element;
   user-select: none;
+  animation: tile-reorder-enter 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, scale 0.25s ease, rotate 0.25s ease;
+}
+
+.tiles-reorder-mode .tile:nth-child(1) { animation-delay: 0ms; }
+.tiles-reorder-mode .tile:nth-child(2) { animation-delay: 40ms; }
+.tiles-reorder-mode .tile:nth-child(3) { animation-delay: 80ms; }
+.tiles-reorder-mode .tile:nth-child(4) { animation-delay: 120ms; }
+.tiles-reorder-mode .tile:nth-child(5) { animation-delay: 160ms; }
+.tiles-reorder-mode .tile:nth-child(n + 6) { animation-delay: 200ms; }
+
+.tiles-reorder-mode .tile:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(0, 0, 0, 0.15);
 }
 
 .tiles-reorder-mode .tile:active,
@@ -260,10 +276,29 @@ input {
   cursor: grabbing;
 }
 
+.tile.tile-moving {
+  z-index: 1;
+}
+
 .tile.tile-dragging {
-  opacity: 0.55;
-  z-index: 2;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 1;
+  z-index: 10;
+  scale: 1.05;
+  rotate: -2deg;
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.5),
+    0 0 0 2px rgba(176, 137, 104, 0.5);
+}
+
+@keyframes tile-reorder-enter {
+  from {
+    opacity: 0.65;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 .tiles-reorder-hint {
