@@ -66,7 +66,7 @@ let recipes = [];
 let allRecipes = [];
 let homeOrder = [];
 let beanTemplates = [];
-let view = { name: 'home', panel: null, pinFlow: null };
+let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
 
 onAuthChange(async (user) => {
   currentUser = user;
@@ -78,7 +78,7 @@ onAuthChange(async (user) => {
     recipes = [];
     allRecipes = [];
     homeOrder = [];
-    view = { name: 'home', panel: null, pinFlow: null };
+    view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
     render();
   }
 });
@@ -230,6 +230,16 @@ function renderShell(content) {
     ? `<img src="${escapeHtml(currentUser.photoURL)}" alt="" class="avatar" />`
     : `<span class="avatar avatar-fallback">${initials(currentUser.displayName)}</span>`;
 
+  const showReorder = view.name === 'home' && recipes.length >= 2;
+  const reorderIconUrl = `${import.meta.env.BASE_URL}images/reorder-icon.png`;
+  const reorderBtn = showReorder
+    ? view.reorderMode
+      ? `<button type="button" class="btn-reorder-header btn-reorder-ok" id="btn-reorder" title="Done reordering">OK</button>`
+      : `<button type="button" class="btn-reorder-header" id="btn-reorder" title="Reorder tiles" aria-label="Reorder tiles">
+          <img src="${reorderIconUrl}" alt="" class="reorder-icon" width="18" height="18" />
+        </button>`
+    : '';
+
   return `
     <header class="header">
       <button type="button" class="brand" id="btn-home">
@@ -238,7 +248,8 @@ function renderShell(content) {
       </button>
       <div class="header-actions">
         <button type="button" class="btn-icon" id="btn-add" title="Add coffee">+</button>
-        <button type="button" class="btn-pin-header" id="btn-pin-coffee">Pin coffee</button>
+        <button type="button" class="btn-pin-header" id="btn-pin-coffee">Pin</button>
+        ${reorderBtn}
         ${photo}
       </div>
     </header>
@@ -257,7 +268,7 @@ function renderCoffeeTile(r, index = 0) {
     ? `<img src="${import.meta.env.BASE_URL}images/decaf_light.png" alt="Decaf" class="tile-decaf-icon" width="18" height="18" />`
     : '';
   return `
-    <button type="button" class="tile" data-id="${escapeHtml(r.id)}" draggable="true">
+    <button type="button" class="tile" data-id="${escapeHtml(r.id)}" draggable="${view.reorderMode ? 'true' : 'false'}">
       <div class="tile-header">
         <h2 class="tile-name">${escapeHtml(displayName(r))}</h2>
         ${displaySubtitle(r) ? `<p class="tile-sub">${escapeHtml(displaySubtitle(r))}</p>` : ''}
@@ -269,7 +280,11 @@ function renderCoffeeTile(r, index = 0) {
 
 function renderHome() {
   const tiles = recipes.map((r, index) => renderCoffeeTile(r, index)).join('');
-  return `<div class="tiles" id="tiles-list">${tiles}</div>`;
+  const reorderClass = view.reorderMode ? ' tiles-reorder-mode' : '';
+  const reorderHint = view.reorderMode
+    ? '<p class="tiles-reorder-hint">Drag tiles to reorder, then tap OK</p>'
+    : '';
+  return `${reorderHint}<div class="tiles${reorderClass}" id="tiles-list">${tiles}</div>`;
 }
 
 function recipeSearchText(recipe) {
@@ -1044,7 +1059,7 @@ function promptApplyScope(methodName, drinkName, allDrinks) {
 
 async function openAddView() {
   if (currentUser) beanTemplates = await fetchAllRecipes(currentUser.uid);
-  view = { name: 'add', panel: null };
+  view = { name: 'add', panel: null, pinFlow: null, reorderMode: false };
   render();
 }
 
@@ -1054,12 +1069,24 @@ function bindLogin() {
 
 function bindShell() {
   document.getElementById('btn-home')?.addEventListener('click', () => {
-    view = { name: 'home', panel: null, pinFlow: null };
+    view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
     render();
   });
   document.getElementById('btn-add')?.addEventListener('click', () => openAddView());
   document.getElementById('btn-pin-coffee')?.addEventListener('click', () => {
     view.pinFlow = { step: 'list' };
+    view.reorderMode = false;
+    render();
+  });
+  document.getElementById('btn-reorder')?.addEventListener('click', async () => {
+    if (view.reorderMode) {
+      view.reorderMode = false;
+      await persistHomeOrder();
+    } else {
+      view.reorderMode = true;
+      view.panel = null;
+      view.pinFlow = null;
+    }
     render();
   });
 }
@@ -1070,6 +1097,7 @@ function bindHome() {
 
   document.querySelectorAll('.tile').forEach((el) => {
     el.addEventListener('click', async () => {
+      if (view.reorderMode) return;
       if (el.dataset.suppressClick === '1') {
         delete el.dataset.suppressClick;
         return;
@@ -1097,7 +1125,7 @@ function syncRecipesOrderFromDom(container) {
 
 function bindTileReorder() {
   const container = document.getElementById('tiles-list');
-  if (!container || recipes.length < 2) return;
+  if (!container || !view.reorderMode || recipes.length < 2) return;
 
   let draggedEl = null;
   let touchEl = null;
@@ -1112,6 +1140,10 @@ function bindTileReorder() {
 
   container.querySelectorAll('.tile').forEach((tile) => {
     tile.addEventListener('dragstart', (e) => {
+      if (!view.reorderMode) {
+        e.preventDefault();
+        return;
+      }
       draggedEl = tile;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', tile.dataset.id);
@@ -1128,6 +1160,7 @@ function bindTileReorder() {
     });
 
     tile.addEventListener('dragover', (e) => {
+      if (!view.reorderMode) return;
       e.preventDefault();
       if (!draggedEl || draggedEl === tile) return;
       e.dataTransfer.dropEffect = 'move';
@@ -1139,13 +1172,13 @@ function bindTileReorder() {
     });
 
     tile.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
+      if (!view.reorderMode || e.touches.length !== 1) return;
       touchEl = tile;
       tile.classList.add('tile-dragging');
     }, { passive: true });
 
     tile.addEventListener('touchmove', (e) => {
-      if (!touchEl || touchEl !== tile) return;
+      if (!view.reorderMode || !touchEl || touchEl !== tile) return;
       e.preventDefault();
       const t = e.touches[0];
       const target = document.elementFromPoint(t.clientX, t.clientY)?.closest('.tile');
@@ -1491,7 +1524,7 @@ function bindPanelEdit(recipe) {
 
 function bindAddForm() {
   const goHome = () => {
-    view = { name: 'home', panel: null };
+    view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
     render();
   };
 
@@ -1586,7 +1619,7 @@ function bindAddForm() {
       else allRecipes.unshift(updated);
       refreshHomeRecipes();
 
-      view = { name: 'home', panel: null };
+      view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
       openPanel(updated.id, methodName, drinkName);
       render();
       return;
@@ -1602,7 +1635,7 @@ function bindAddForm() {
     homeOrder = [created.id, ...homeOrder.filter((id) => id !== created.id)];
     await persistHomeOrder();
     refreshHomeRecipes();
-    view = { name: 'home', panel: null };
+    view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
     openPanel(created.id, methodName || null, drinkName || null);
     render();
   });
