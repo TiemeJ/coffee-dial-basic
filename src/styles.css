@@ -370,7 +370,7 @@ input {
   max-width: 420px;
   max-height: 85vh;
   overflow-y: auto;
-  padding: 1rem 1.2rem 1.25rem;
+  padding: 0.85rem 1rem 1rem;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -380,41 +380,42 @@ input {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .pin-header h2 {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
 .pin-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.6);
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
 }
 
 .pin-hint {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.55);
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
+  line-height: 1.4;
 }
 
 .pin-empty {
   color: rgba(255, 255, 255, 0.55);
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 1.5rem 1rem;
 }
 
 .pin-list-empty {
-  padding: 1.25rem 1rem;
+  padding: 1rem;
 }
 
 .pin-search {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
+  gap: 0.25rem;
+  margin-bottom: 0.6rem;
 }
 
 .pin-search-label {
@@ -426,12 +427,12 @@ input {
 }
 
 .pin-search-input {
-  padding: 0.55rem 0.65rem;
+  padding: 0.45rem 0.55rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background-color: var(--bg-input);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   width: 100%;
 }
 
@@ -451,15 +452,15 @@ input {
 .pin-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .pin-list-item {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 0;
   text-align: left;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.06);
   transition: background 0.15s, border-color 0.15s;
@@ -475,7 +476,7 @@ input {
   flex: 1;
   min-width: 0;
   text-align: left;
-  padding: 0.85rem 1rem;
+  padding: 0.5rem 0.7rem;
   background: transparent;
   border: none;
   color: inherit;
@@ -483,19 +484,64 @@ input {
   font: inherit;
 }
 
+.pin-list-item-on-home {
+  border-color: rgba(176, 137, 104, 0.45);
+  background: rgba(176, 137, 104, 0.08);
+}
+
+.pin-list-item-on-home:hover {
+  border-color: rgba(176, 137, 104, 0.55);
+  background: rgba(176, 137, 104, 0.12);
+}
+
+.pin-list-toggle {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  min-height: 2rem;
+  padding: 0 0.45rem;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.pin-list-toggle.is-unpin {
+  color: var(--text-muted);
+}
+
+.pin-list-toggle:hover {
+  background: rgba(176, 137, 104, 0.12);
+}
+
+.pin-list-toggle.is-unpin:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .pin-list-delete,
 .pin-delete-drink {
   flex-shrink: 0;
-  padding: 0.5rem 0.75rem;
+  min-height: 2rem;
+  padding: 0 0.55rem;
   background: transparent;
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--danger);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
 }
 
 .pin-list-delete:hover,
@@ -506,40 +552,43 @@ input {
 .pin-list-name {
   display: block;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
+  line-height: 1.2;
 }
 
 .pin-list-sub {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.55);
-  margin-top: 0.15rem;
+  margin-top: 0.1rem;
+  line-height: 1.2;
 }
 
 .pin-list-meta {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.66rem;
   color: rgba(255, 255, 255, 0.4);
-  margin-top: 0.35rem;
+  margin-top: 0.15rem;
+  line-height: 1.2;
 }
 
 .pin-method-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .pin-method-name {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: rgba(196, 149, 106, 0.9);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .pin-checks {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .pin-check-row {
@@ -569,12 +618,13 @@ input {
 .pin-check {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.65rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  min-height: 2rem;
 }
 
 .pin-check:hover {
@@ -583,16 +633,16 @@ input {
 
 .pin-check input {
   accent-color: var(--accent, #c4956a);
-  width: 1rem;
-  height: 1rem;
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .pin-footer {
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -1933,18 +1983,17 @@ input {
   }
 
   .pin-list-main {
-    padding: 0.75rem 0.85rem;
+    padding: 0.5rem 0.65rem;
   }
 
   .pin-list-delete,
   .pin-delete-drink {
-    min-width: 52px;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
   }
 
   .pin-check {
-    padding: 0.65rem 0.75rem;
-    min-height: 44px;
+    padding: 0.4rem 0.55rem;
+    min-height: 2rem;
   }
 
   .pin-footer {

@@ -333,9 +333,27 @@ export function buildPinMethodsFromForm(form) {
   return pinMethods;
 }
 
+export function buildFullPinMethods(recipe) {
+  const normalized = normalizeMethods(recipe?.methods);
+  const pinMethods = {};
+  for (const method of Object.keys(normalized)) {
+    const drinks = drinkNames(normalized, method);
+    if (drinks.length) pinMethods[method] = drinks;
+  }
+  return pinMethods;
+}
+
 export function isPinChecked(recipe, method, drink) {
-  const drinks = recipe?.pin?.methods?.[method];
-  return Array.isArray(drinks) && drinks.includes(drink);
+  const normalized = normalizeMethods(recipe?.methods);
+  if (!normalized[method]?.[drink]) return false;
+
+  if (hasActivePin(recipe)) {
+    const drinks = recipe?.pin?.methods?.[method];
+    return Array.isArray(drinks) && drinks.includes(drink);
+  }
+
+  // Open on home without a pin filter: all saved methods/drinks are visible
+  return recipe.isOpen !== false;
 }
 
 export function emptyDrinkParams() {

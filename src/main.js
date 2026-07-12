@@ -54,6 +54,7 @@ import {
   visibleDrinkNames,
   resolveVisibleSelection,
   buildPinMethodsFromForm,
+  buildFullPinMethods,
   isPinChecked,
 } from './utils.js';
 
@@ -102,6 +103,26 @@ async function persistHomeOrder() {
   if (!currentUser) return;
   homeOrder = recipes.map((r) => r.id);
   await saveHomeOrder(currentUser.uid, homeOrder);
+}
+
+async function pinRecipeOnHome(recipe) {
+  const pinMethods = buildFullPinMethods(recipe);
+  await updateRecipe(currentUser.uid, recipe.id, { isOpen: true });
+  await saveRecipePin(currentUser.uid, recipe.id, pinMethods);
+  homeOrder = [...homeOrder.filter((id) => id !== recipe.id), recipe.id];
+  await saveHomeOrder(currentUser.uid, homeOrder);
+}
+
+async function unpinRecipeFromHome(recipe) {
+  if (hasActivePin(recipe)) {
+    await saveRecipePin(currentUser.uid, recipe.id, {});
+  }
+  if (recipe.isOpen !== false) {
+    await updateRecipe(currentUser.uid, recipe.id, { isOpen: false });
+  }
+  homeOrder = homeOrder.filter((id) => id !== recipe.id);
+  await saveHomeOrder(currentUser.uid, homeOrder);
+  if (view.panel?.recipeId === recipe.id) view.panel = null;
 }
 
 function getRecipe(id) {
@@ -321,13 +342,15 @@ function renderPinFlow() {
       .map((r) => {
         const methods = methodNames(r.methods);
         const drinkCount = methods.reduce((n, m) => n + drinkNames(r.methods, m).length, 0);
+        const onHome = isOnHomeScreen(r);
         return `
-        <div class="pin-list-item" data-search-text="${escapeHtml(recipeSearchText(r))}">
+        <div class="pin-list-item${onHome ? ' pin-list-item-on-home' : ''}" data-search-text="${escapeHtml(recipeSearchText(r))}">
           <button type="button" class="pin-list-main" data-pin-recipe="${escapeHtml(r.id)}">
             <span class="pin-list-name">${escapeHtml(displayName(r))}</span>
             ${displaySubtitle(r) ? `<span class="pin-list-sub">${escapeHtml(displaySubtitle(r))}</span>` : ''}
             <span class="pin-list-meta">${methods.length} method${methods.length === 1 ? '' : 's'} · ${drinkCount} drink${drinkCount === 1 ? '' : 's'}</span>
           </button>
+          <button type="button" class="pin-list-toggle${onHome ? ' is-unpin' : ''}" data-pin-toggle-recipe="${escapeHtml(r.id)}" title="${onHome ? 'Remove from home screen' : 'Add to home screen'}" aria-label="${onHome ? 'Unpin coffee' : 'Pin coffee'}">${onHome ? 'Unpin' : 'Pin'}</button>
           <button type="button" class="pin-list-delete" data-pin-delete-recipe="${escapeHtml(r.id)}" title="Delete coffee" aria-label="Delete coffee">Delete</button>
         </div>`;
       })
@@ -434,6 +457,23 @@ function bindPinFlow() {
   document.querySelectorAll('[data-pin-recipe]').forEach((btn) => {
     btn.addEventListener('click', () => {
       view.pinFlow = { step: 'configure', recipeId: btn.dataset.pinRecipe };
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-pin-toggle-recipe]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const recipeId = btn.dataset.pinToggleRecipe;
+      const recipe = allRecipes.find((r) => r.id === recipeId);
+      if (!recipe) return;
+
+      if (isOnHomeScreen(recipe)) {
+        await unpinRecipeFromHome(recipe);
+      } else {
+        await pinRecipeOnHome(recipe);
+      }
+      await loadRecipes();
       render();
     });
   });
@@ -1273,12 +1313,7 @@ function bindDetailPanel() {
       }
 
       if (action === 'unpin') {
-        if (hasActivePin(recipe)) {
-          await saveRecipePin(currentUser.uid, recipe.id, {});
-        }
-        if (recipe.isOpen !== false) {
-          await updateRecipe(currentUser.uid, recipe.id, { isOpen: false });
-        }
+        await unpinRecipeFromHome(recipe);
         view.panel = null;
         await loadRecipes();
         render();
