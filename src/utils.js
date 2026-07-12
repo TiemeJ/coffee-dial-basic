@@ -31,6 +31,12 @@ export function displaySubtitle(recipe) {
   return recipe.origin?.trim() || '';
 }
 
+const COFFEE_INFO_FIELDS = ['name', 'roaster', 'farmer', 'origin', 'variety', 'processing', 'roastType'];
+
+export function isDecafCoffee(recipe) {
+  return COFFEE_INFO_FIELDS.some((field) => String(recipe?.[field] ?? '').toLowerCase().includes('decaf'));
+}
+
 export function generateCoffeeName(data) {
   if (data.name?.trim()) return data.name.trim();
   const parts = [data.variety, data.farmer, data.origin].map((s) => s?.trim()).filter(Boolean);

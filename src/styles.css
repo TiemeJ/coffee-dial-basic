@@ -305,6 +305,17 @@ input {
   white-space: nowrap;
 }
 
+.tile-decaf-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin-top: 0.35rem;
+  flex-shrink: 0;
+  align-self: flex-start;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
 /* Pin coffee flow */
 .pin-panel {
   background: var(--bg-elevated);

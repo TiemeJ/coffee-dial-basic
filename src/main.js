@@ -43,6 +43,7 @@ import {
   resolvePresetValue,
   findMatchingRecipe,
   beanFieldsFromRecipe,
+  isDecafCoffee,
   hasActivePin,
   isOnHomeScreen,
   getPinnedPairs,
@@ -232,11 +233,15 @@ function tileBackgroundUrl(variant) {
 function renderCoffeeTile(r, index = 0) {
   const variant = (index % TILE_BG_COUNT) + 1;
   const patternStyle = `background-image: url('${tileBackgroundUrl(variant)}')`;
+  const decafIcon = isDecafCoffee(r)
+    ? `<img src="${import.meta.env.BASE_URL}images/decaf_light.png" alt="Decaf" class="tile-decaf-icon" width="18" height="18" />`
+    : '';
   return `
     <button type="button" class="tile" data-id="${escapeHtml(r.id)}">
       <div class="tile-header">
         <h2 class="tile-name">${escapeHtml(displayName(r))}</h2>
         ${displaySubtitle(r) ? `<p class="tile-sub">${escapeHtml(displaySubtitle(r))}</p>` : ''}
+        ${decafIcon}
       </div>
       <div class="tile-pattern" style="${patternStyle}" aria-hidden="true"></div>
     </button>`;
