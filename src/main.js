@@ -512,7 +512,7 @@ function renderPinFlow() {
       <div class="panel-backdrop" id="pin-backdrop">
         <div class="pin-panel" role="dialog">
           <header class="pin-header">
-            <h2>Choose coffee</h2>
+            <h2>Coffees</h2>
             <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
           </header>
           <div class="pin-toolbar">
