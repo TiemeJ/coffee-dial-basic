@@ -46,6 +46,7 @@ import {
   findMatchingRecipe,
   beanFieldsFromRecipe,
   isDecafCoffee,
+  recipeSearchText,
   hasActivePin,
   isOnHomeScreen,
   applyHomeOrder,
@@ -269,7 +270,12 @@ function renderShell(content) {
       </button>
       <div class="header-actions">
         <button type="button" class="btn-icon" id="btn-add" title="Add coffee">+</button>
-        <button type="button" class="btn-pin-header" id="btn-pin-coffee">Pin</button>
+        <button type="button" class="btn-pin-header" id="btn-pin-coffee" title="Search coffees" aria-label="Search coffees">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2" />
+            <path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
         ${reorderBtn}
         ${photo}
       </div>
@@ -308,19 +314,51 @@ function renderHome() {
   return `${reorderHint}<div class="tiles${reorderClass}" id="tiles-list">${tiles}</div>`;
 }
 
-function recipeSearchText(recipe) {
-  return [
-    displayName(recipe),
-    displaySubtitle(recipe),
-    recipe.name,
-    recipe.roaster,
-    recipe.farmer,
-    recipe.origin,
-    recipe.variety,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+function sortRecipesForPinList(recipes) {
+  return [...recipes].sort((a, b) =>
+    displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base' })
+  );
+}
+
+function renderPinListItem(recipe) {
+  const methods = methodNames(recipe.methods);
+  const drinkCount = methods.reduce((n, m) => n + drinkNames(recipe.methods, m).length, 0);
+  const onHome = isOnHomeScreen(recipe);
+  return `
+    <div class="pin-list-item${onHome ? ' pin-list-item-on-home' : ''}" data-search-text="${escapeHtml(recipeSearchText(recipe))}" data-on-home="${onHome ? '1' : '0'}">
+      <button type="button" class="pin-list-main" data-pin-recipe="${escapeHtml(recipe.id)}">
+        <span class="pin-list-name">${escapeHtml(displayName(recipe))}</span>
+        ${displaySubtitle(recipe) ? `<span class="pin-list-sub">${escapeHtml(displaySubtitle(recipe))}</span>` : ''}
+        <span class="pin-list-meta">${methods.length} method${methods.length === 1 ? '' : 's'} · ${drinkCount} drink${drinkCount === 1 ? '' : 's'}</span>
+      </button>
+      <button type="button" class="pin-list-toggle${onHome ? ' is-unpin' : ''}" data-pin-toggle-recipe="${escapeHtml(recipe.id)}" title="${onHome ? 'Remove from home screen' : 'Add to home screen'}" aria-label="${onHome ? 'Unpin coffee' : 'Pin coffee'}">${onHome ? 'Unpin' : 'Pin'}</button>
+      <button type="button" class="pin-list-delete" data-pin-delete-recipe="${escapeHtml(recipe.id)}" title="Delete coffee" aria-label="Delete coffee">Delete</button>
+    </div>`;
+}
+
+function renderPinFilterChips(activeFilter) {
+  const chips = [
+    { id: 'all', label: 'All' },
+    { id: 'on-home', label: 'On home' },
+    { id: 'not-on-home', label: 'Not on home' },
+  ];
+  return chips
+    .map(
+      ({ id, label }) => `
+    <button type="button" class="pin-filter-chip${activeFilter === id ? ' is-active' : ''}" data-pin-filter="${id}" aria-pressed="${activeFilter === id}">${label}</button>`
+    )
+    .join('');
+}
+
+function renderPinListSection(title, sectionId, recipes) {
+  if (!recipes.length) return '';
+  return `
+    <section class="pin-list-section" data-pin-section="${sectionId}">
+      <h3 class="pin-list-section-title">${title}</h3>
+      <div class="pin-list">
+        ${recipes.map(renderPinListItem).join('')}
+      </div>
+    </section>`;
 }
 
 function renderPinFlow() {
@@ -338,23 +376,13 @@ function renderPinFlow() {
         </div>`;
     }
 
-    const items = allRecipes
-      .map((r) => {
-        const methods = methodNames(r.methods);
-        const drinkCount = methods.reduce((n, m) => n + drinkNames(r.methods, m).length, 0);
-        const onHome = isOnHomeScreen(r);
-        return `
-        <div class="pin-list-item${onHome ? ' pin-list-item-on-home' : ''}" data-search-text="${escapeHtml(recipeSearchText(r))}">
-          <button type="button" class="pin-list-main" data-pin-recipe="${escapeHtml(r.id)}">
-            <span class="pin-list-name">${escapeHtml(displayName(r))}</span>
-            ${displaySubtitle(r) ? `<span class="pin-list-sub">${escapeHtml(displaySubtitle(r))}</span>` : ''}
-            <span class="pin-list-meta">${methods.length} method${methods.length === 1 ? '' : 's'} · ${drinkCount} drink${drinkCount === 1 ? '' : 's'}</span>
-          </button>
-          <button type="button" class="pin-list-toggle${onHome ? ' is-unpin' : ''}" data-pin-toggle-recipe="${escapeHtml(r.id)}" title="${onHome ? 'Remove from home screen' : 'Add to home screen'}" aria-label="${onHome ? 'Unpin coffee' : 'Pin coffee'}">${onHome ? 'Unpin' : 'Pin'}</button>
-          <button type="button" class="pin-list-delete" data-pin-delete-recipe="${escapeHtml(r.id)}" title="Delete coffee" aria-label="Delete coffee">Delete</button>
-        </div>`;
-      })
-      .join('');
+    const activeFilter = view.pinFlow.filter || 'all';
+    const searchValue = view.pinFlow.search || '';
+    const sorted = sortRecipesForPinList(allRecipes);
+    const onHomeRecipes = sorted.filter(isOnHomeScreen);
+    const libraryRecipes = sorted.filter((r) => !isOnHomeScreen(r));
+    const onHomeCount = onHomeRecipes.length;
+    const totalCount = allRecipes.length;
 
     return `
       <div class="panel-backdrop" id="pin-backdrop">
@@ -363,12 +391,21 @@ function renderPinFlow() {
             <h2>Choose coffee</h2>
             <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
           </header>
-          <label class="pin-search">
-            <span class="pin-search-label">Search</span>
-            <input type="search" id="pin-coffee-search" class="pin-search-input" placeholder="Search coffees…" autocomplete="off" />
-          </label>
+          <div class="pin-toolbar">
+            <label class="pin-search">
+              <span class="pin-search-label">Search</span>
+              <input type="search" id="pin-coffee-search" class="pin-search-input" placeholder="Search coffees, methods, drinks…" autocomplete="off" value="${escapeHtml(searchValue)}" />
+            </label>
+            <div class="pin-filters" role="group" aria-label="Filter coffees">
+              ${renderPinFilterChips(activeFilter)}
+            </div>
+            <p class="pin-list-count" id="pin-list-count" data-total="${totalCount}" data-on-home="${onHomeCount}"></p>
+          </div>
           <p class="pin-empty pin-list-empty" id="pin-list-empty" hidden>No coffees match your search.</p>
-          <div class="pin-list" id="pin-list">${items}</div>
+          <div class="pin-list-body" id="pin-list-body">
+            ${renderPinListSection('On home', 'on-home', onHomeRecipes)}
+            ${renderPinListSection('Library', 'library', libraryRecipes)}
+          </div>
         </div>
       </div>`;
   }
@@ -436,27 +473,80 @@ function bindPinFlow() {
   });
 
   const pinSearchInput = document.getElementById('pin-coffee-search');
-  const pinList = document.getElementById('pin-list');
   const pinListEmpty = document.getElementById('pin-list-empty');
+  const pinListCount = document.getElementById('pin-list-count');
 
-  function filterPinCoffeeList() {
-    if (!pinList) return;
-    const query = pinSearchInput?.value.trim().toLowerCase() ?? '';
+  function updatePinListCount(visible) {
+    if (!pinListCount) return;
+    const total = Number(pinListCount.dataset.total) || 0;
+    const onHome = Number(pinListCount.dataset.onHome) || 0;
+    const query = view.pinFlow?.search?.trim() ?? '';
+    const filter = view.pinFlow?.filter || 'all';
+    const isFiltered = Boolean(query) || filter !== 'all';
+
+    if (isFiltered) {
+      pinListCount.textContent = `${visible} matching · ${onHome} on home · ${total} total`;
+      return;
+    }
+    pinListCount.textContent = `${total} coffee${total === 1 ? '' : 's'} · ${onHome} on home`;
+  }
+
+  function applyPinListFilters() {
+    const query = view.pinFlow?.search?.trim().toLowerCase() ?? '';
+    const filter = view.pinFlow?.filter || 'all';
     let visible = 0;
-    pinList.querySelectorAll('.pin-list-item').forEach((item) => {
+
+    document.querySelectorAll('.pin-list-item').forEach((item) => {
       const text = item.dataset.searchText || '';
-      const show = !query || text.includes(query);
+      const onHome = item.dataset.onHome === '1';
+
+      let matchesFilter = true;
+      if (filter === 'on-home') matchesFilter = onHome;
+      else if (filter === 'not-on-home') matchesFilter = !onHome;
+
+      const matchesSearch = !query || text.includes(query);
+      const show = matchesFilter && matchesSearch;
       item.hidden = !show;
       if (show) visible += 1;
     });
+
+    document.querySelectorAll('.pin-list-section').forEach((section) => {
+      const items = section.querySelectorAll('.pin-list-item');
+      const anyVisible = [...items].some((item) => !item.hidden);
+      section.hidden = !anyVisible;
+    });
+
     if (pinListEmpty) pinListEmpty.hidden = visible > 0;
+    updatePinListCount(visible);
   }
 
-  pinSearchInput?.addEventListener('input', filterPinCoffeeList);
+  pinSearchInput?.addEventListener('input', () => {
+    view.pinFlow.search = pinSearchInput.value;
+    applyPinListFilters();
+  });
+
+  document.querySelectorAll('[data-pin-filter]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      view.pinFlow.filter = btn.dataset.pinFilter;
+      document.querySelectorAll('[data-pin-filter]').forEach((chip) => {
+        const active = chip === btn;
+        chip.classList.toggle('is-active', active);
+        chip.setAttribute('aria-pressed', String(active));
+      });
+      applyPinListFilters();
+    });
+  });
+
+  applyPinListFilters();
 
   document.querySelectorAll('[data-pin-recipe]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      view.pinFlow = { step: 'configure', recipeId: btn.dataset.pinRecipe };
+      view.pinFlow = {
+        step: 'configure',
+        recipeId: btn.dataset.pinRecipe,
+        filter: view.pinFlow?.filter || 'all',
+        search: view.pinFlow?.search || '',
+      };
       render();
     });
   });
@@ -488,7 +578,9 @@ function bindPinFlow() {
 
       await deleteRecipe(currentUser.uid, recipeId);
       if (view.panel?.recipeId === recipeId) view.panel = null;
-      if (view.pinFlow?.recipeId === recipeId) view.pinFlow = { step: 'list' };
+      if (view.pinFlow?.recipeId === recipeId) {
+        view.pinFlow = { step: 'list', filter: view.pinFlow?.filter || 'all', search: view.pinFlow?.search || '' };
+      }
       await loadRecipes();
       render();
     });
@@ -533,7 +625,7 @@ function bindPinFlow() {
   });
 
   document.getElementById('pin-back')?.addEventListener('click', () => {
-    view.pinFlow = { step: 'list' };
+    view.pinFlow = { step: 'list', filter: view.pinFlow?.filter || 'all', search: view.pinFlow?.search || '' };
     render();
   });
 
@@ -1114,7 +1206,7 @@ function bindShell() {
   });
   document.getElementById('btn-add')?.addEventListener('click', () => openAddView());
   document.getElementById('btn-pin-coffee')?.addEventListener('click', () => {
-    view.pinFlow = { step: 'list' };
+    view.pinFlow = { step: 'list', filter: 'all', search: '' };
     view.reorderMode = false;
     render();
   });
@@ -1352,7 +1444,12 @@ function bindDetailPanel() {
 
       if (action === 'edit-pin') {
         view.panel = null;
-        view.pinFlow = { step: 'configure', recipeId: recipe.id };
+        view.pinFlow = {
+          step: 'configure',
+          recipeId: recipe.id,
+          filter: view.pinFlow?.filter || 'all',
+          search: view.pinFlow?.search || '',
+        };
         render();
         return;
       }

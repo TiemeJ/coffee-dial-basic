@@ -37,6 +37,27 @@ export function isDecafCoffee(recipe) {
   return COFFEE_INFO_FIELDS.some((field) => String(recipe?.[field] ?? '').toLowerCase().includes('decaf'));
 }
 
+export function recipeSearchText(recipe) {
+  const methods = methodNames(recipe?.methods);
+  const drinks = methods.flatMap((method) => drinkNames(recipe?.methods, method));
+  return [
+    displayName(recipe),
+    displaySubtitle(recipe),
+    recipe?.name,
+    recipe?.roaster,
+    recipe?.farmer,
+    recipe?.origin,
+    recipe?.variety,
+    recipe?.processing,
+    recipe?.roastType,
+    ...methods,
+    ...drinks,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export function generateCoffeeName(data) {
   if (data.name?.trim()) return data.name.trim();
   const parts = [data.variety, data.farmer, data.origin].map((s) => s?.trim()).filter(Boolean);
