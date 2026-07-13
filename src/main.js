@@ -57,7 +57,13 @@ import {
   buildPinMethodsFromForm,
   buildFullPinMethods,
   isPinChecked,
+  normalizeRecipe,
 } from './utils.js';
+import {
+  buildPinListRows,
+  createPinVirtualList,
+  formatPinListCount,
+} from './pinList.js';
 
 const TILE_BG_COUNT = 6;
 
@@ -69,6 +75,8 @@ let allRecipes = [];
 let homeOrder = [];
 let beanTemplates = [];
 let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
+let pinVirtualList = null;
+let recipesFetchToken = 0;
 
 onAuthChange(async (user) => {
   currentUser = user;
@@ -87,12 +95,67 @@ onAuthChange(async (user) => {
 
 async function loadRecipes() {
   if (!currentUser) return;
+  const token = ++recipesFetchToken;
   const [all, order] = await Promise.all([
     fetchAllRecipes(currentUser.uid),
     fetchHomeOrder(currentUser.uid),
   ]);
+  if (token !== recipesFetchToken) return;
   allRecipes = all;
   homeOrder = order;
+  refreshHomeRecipes();
+}
+
+function recipeRevision(recipe) {
+  return [
+    recipe.isOpen,
+    JSON.stringify(recipe.pin?.methods ?? {}),
+    displayName(recipe),
+    methodNames(recipe.methods).length,
+  ].join('|');
+}
+
+function recipesSnapshotChanged(prevRecipes, nextRecipes, prevOrder, nextOrder) {
+  if (prevRecipes.length !== nextRecipes.length) return true;
+  if (prevOrder.join(',') !== nextOrder.join(',')) return true;
+  const prevMap = new Map(prevRecipes.map((recipe) => [recipe.id, recipeRevision(recipe)]));
+  return nextRecipes.some((recipe) => prevMap.get(recipe.id) !== recipeRevision(recipe));
+}
+
+async function refreshRecipesInBackground() {
+  if (!currentUser) return;
+  const token = ++recipesFetchToken;
+  try {
+    const [all, order] = await Promise.all([
+      fetchAllRecipes(currentUser.uid),
+      fetchHomeOrder(currentUser.uid),
+    ]);
+    if (token !== recipesFetchToken) return;
+    if (!recipesSnapshotChanged(allRecipes, all, homeOrder, order)) return;
+    allRecipes = all;
+    homeOrder = order;
+    refreshHomeRecipes();
+    if (view.pinFlow?.step === 'list') {
+      syncPinListCount();
+      pinVirtualList?.update();
+      return;
+    }
+    if (view.name === 'home') render();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function patchRecipeInMemory(recipeId, patch) {
+  const idx = allRecipes.findIndex((recipe) => recipe.id === recipeId);
+  if (idx < 0) return;
+  allRecipes[idx] = normalizeRecipe({ ...allRecipes[idx], ...patch });
+  refreshHomeRecipes();
+}
+
+function removeRecipeFromMemory(recipeId) {
+  allRecipes = allRecipes.filter((recipe) => recipe.id !== recipeId);
+  homeOrder = homeOrder.filter((id) => id !== recipeId);
   refreshHomeRecipes();
 }
 
@@ -112,6 +175,11 @@ async function pinRecipeOnHome(recipe) {
   await saveRecipePin(currentUser.uid, recipe.id, pinMethods);
   homeOrder = [...homeOrder.filter((id) => id !== recipe.id), recipe.id];
   await saveHomeOrder(currentUser.uid, homeOrder);
+  const hasAny = Object.values(pinMethods).some((drinks) => Array.isArray(drinks) && drinks.length > 0);
+  patchRecipeInMemory(recipe.id, {
+    isOpen: true,
+    pin: hasAny ? { methods: pinMethods } : undefined,
+  });
 }
 
 async function unpinRecipeFromHome(recipe) {
@@ -123,6 +191,7 @@ async function unpinRecipeFromHome(recipe) {
   }
   homeOrder = homeOrder.filter((id) => id !== recipe.id);
   await saveHomeOrder(currentUser.uid, homeOrder);
+  patchRecipeInMemory(recipe.id, { isOpen: false, pin: undefined });
   if (view.panel?.recipeId === recipe.id) view.panel = null;
 }
 
@@ -314,12 +383,6 @@ function renderHome() {
   return `${reorderHint}<div class="tiles${reorderClass}" id="tiles-list">${tiles}</div>`;
 }
 
-function sortRecipesForPinList(recipes) {
-  return [...recipes].sort((a, b) =>
-    displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base' })
-  );
-}
-
 function renderPinListItem(recipe) {
   const methods = methodNames(recipe.methods);
   const drinkCount = methods.reduce((n, m) => n + drinkNames(recipe.methods, m).length, 0);
@@ -350,15 +413,29 @@ function renderPinFilterChips(activeFilter) {
     .join('');
 }
 
-function renderPinListSection(title, sectionId, recipes) {
-  if (!recipes.length) return '';
-  return `
-    <section class="pin-list-section" data-pin-section="${sectionId}">
-      <h3 class="pin-list-section-title">${title}</h3>
-      <div class="pin-list">
-        ${recipes.map(renderPinListItem).join('')}
-      </div>
-    </section>`;
+function renderPinSectionRow(title, isFirst) {
+  return `<h3 class="pin-list-section-title pin-list-virtual-section${isFirst ? ' is-first' : ''}">${escapeHtml(title)}</h3>`;
+}
+
+function syncPinListCount() {
+  const pinListCount = document.getElementById('pin-list-count');
+  if (!pinListCount || view.pinFlow?.step !== 'list') return;
+  const stats = buildPinListRows(
+    allRecipes,
+    view.pinFlow.filter || 'all',
+    view.pinFlow.search || ''
+  );
+  pinListCount.dataset.total = String(stats.total);
+  pinListCount.dataset.onHome = String(stats.onHomeTotal);
+  pinListCount.textContent = formatPinListCount({
+    visible: stats.visible,
+    total: stats.total,
+    onHomeTotal: stats.onHomeTotal,
+    filter: view.pinFlow.filter || 'all',
+    query: view.pinFlow.search || '',
+  });
+  const pinListEmpty = document.getElementById('pin-list-empty');
+  if (pinListEmpty) pinListEmpty.hidden = stats.visible > 0;
 }
 
 function renderPinFlow() {
@@ -378,11 +455,7 @@ function renderPinFlow() {
 
     const activeFilter = view.pinFlow.filter || 'all';
     const searchValue = view.pinFlow.search || '';
-    const sorted = sortRecipesForPinList(allRecipes);
-    const onHomeRecipes = sorted.filter(isOnHomeScreen);
-    const libraryRecipes = sorted.filter((r) => !isOnHomeScreen(r));
-    const onHomeCount = onHomeRecipes.length;
-    const totalCount = allRecipes.length;
+    const stats = buildPinListRows(allRecipes, activeFilter, searchValue);
 
     return `
       <div class="panel-backdrop" id="pin-backdrop">
@@ -399,13 +472,18 @@ function renderPinFlow() {
             <div class="pin-filters" role="group" aria-label="Filter coffees">
               ${renderPinFilterChips(activeFilter)}
             </div>
-            <p class="pin-list-count" id="pin-list-count" data-total="${totalCount}" data-on-home="${onHomeCount}"></p>
+            <p class="pin-list-count" id="pin-list-count" data-total="${stats.total}" data-on-home="${stats.onHomeTotal}">
+              ${escapeHtml(formatPinListCount({
+                visible: stats.visible,
+                total: stats.total,
+                onHomeTotal: stats.onHomeTotal,
+                filter: activeFilter,
+                query: searchValue,
+              }))}
+            </p>
           </div>
-          <p class="pin-empty pin-list-empty" id="pin-list-empty" hidden>No coffees match your search.</p>
-          <div class="pin-list-body" id="pin-list-body">
-            ${renderPinListSection('On home', 'on-home', onHomeRecipes)}
-            ${renderPinListSection('Library', 'library', libraryRecipes)}
-          </div>
+          <p class="pin-empty pin-list-empty" id="pin-list-empty"${stats.visible > 0 ? ' hidden' : ''}>No coffees match your search.</p>
+          <div class="pin-list-body pin-list-body-virtual" id="pin-list-body"></div>
         </div>
       </div>`;
   }
@@ -460,6 +538,9 @@ function renderPinFlow() {
 }
 
 function bindPinFlow() {
+  pinVirtualList?.destroy();
+  pinVirtualList = null;
+
   document.getElementById('pin-backdrop')?.addEventListener('click', (e) => {
     if (e.target.id === 'pin-backdrop') {
       view.pinFlow = null;
@@ -472,119 +553,82 @@ function bindPinFlow() {
     render();
   });
 
-  const pinSearchInput = document.getElementById('pin-coffee-search');
-  const pinListEmpty = document.getElementById('pin-list-empty');
-  const pinListCount = document.getElementById('pin-list-count');
+  if (view.pinFlow?.step === 'list') {
+    const pinSearchInput = document.getElementById('pin-coffee-search');
+    const pinListBody = document.getElementById('pin-list-body');
 
-  function updatePinListCount(visible) {
-    if (!pinListCount) return;
-    const total = Number(pinListCount.dataset.total) || 0;
-    const onHome = Number(pinListCount.dataset.onHome) || 0;
-    const query = view.pinFlow?.search?.trim() ?? '';
-    const filter = view.pinFlow?.filter || 'all';
-    const isFiltered = Boolean(query) || filter !== 'all';
+    pinVirtualList = createPinVirtualList(pinListBody, {
+      getRecipes: () => allRecipes,
+      getFilter: () => view.pinFlow?.filter || 'all',
+      getQuery: () => view.pinFlow?.search || '',
+      renderItem: renderPinListItem,
+      renderSection: renderPinSectionRow,
+    });
+    pinVirtualList.update();
+    syncPinListCount();
 
-    if (isFiltered) {
-      pinListCount.textContent = `${visible} matching · ${onHome} on home · ${total} total`;
-      return;
-    }
-    pinListCount.textContent = `${total} coffee${total === 1 ? '' : 's'} · ${onHome} on home`;
-  }
-
-  function applyPinListFilters() {
-    const query = view.pinFlow?.search?.trim().toLowerCase() ?? '';
-    const filter = view.pinFlow?.filter || 'all';
-    let visible = 0;
-
-    document.querySelectorAll('.pin-list-item').forEach((item) => {
-      const text = item.dataset.searchText || '';
-      const onHome = item.dataset.onHome === '1';
-
-      let matchesFilter = true;
-      if (filter === 'on-home') matchesFilter = onHome;
-      else if (filter === 'not-on-home') matchesFilter = !onHome;
-
-      const matchesSearch = !query || text.includes(query);
-      const show = matchesFilter && matchesSearch;
-      item.hidden = !show;
-      if (show) visible += 1;
+    pinSearchInput?.addEventListener('input', () => {
+      view.pinFlow.search = pinSearchInput.value;
+      syncPinListCount();
+      pinVirtualList.update({ resetScroll: true });
     });
 
-    document.querySelectorAll('.pin-list-section').forEach((section) => {
-      const items = section.querySelectorAll('.pin-list-item');
-      const anyVisible = [...items].some((item) => !item.hidden);
-      section.hidden = !anyVisible;
-    });
-
-    if (pinListEmpty) pinListEmpty.hidden = visible > 0;
-    updatePinListCount(visible);
-  }
-
-  pinSearchInput?.addEventListener('input', () => {
-    view.pinFlow.search = pinSearchInput.value;
-    applyPinListFilters();
-  });
-
-  document.querySelectorAll('[data-pin-filter]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      view.pinFlow.filter = btn.dataset.pinFilter;
-      document.querySelectorAll('[data-pin-filter]').forEach((chip) => {
-        const active = chip === btn;
-        chip.classList.toggle('is-active', active);
-        chip.setAttribute('aria-pressed', String(active));
+    document.querySelectorAll('[data-pin-filter]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        view.pinFlow.filter = btn.dataset.pinFilter;
+        document.querySelectorAll('[data-pin-filter]').forEach((chip) => {
+          const active = chip === btn;
+          chip.classList.toggle('is-active', active);
+          chip.setAttribute('aria-pressed', String(active));
+        });
+        syncPinListCount();
+        pinVirtualList.update({ resetScroll: true });
       });
-      applyPinListFilters();
     });
-  });
 
-  applyPinListFilters();
+    pinListBody?.addEventListener('click', async (e) => {
+      const toggleBtn = e.target.closest('[data-pin-toggle-recipe]');
+      if (toggleBtn) {
+        e.stopPropagation();
+        const recipeId = toggleBtn.dataset.pinToggleRecipe;
+        const recipe = allRecipes.find((r) => r.id === recipeId);
+        if (!recipe) return;
 
-  document.querySelectorAll('[data-pin-recipe]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      view.pinFlow = {
-        step: 'configure',
-        recipeId: btn.dataset.pinRecipe,
-        filter: view.pinFlow?.filter || 'all',
-        search: view.pinFlow?.search || '',
-      };
-      render();
-    });
-  });
-
-  document.querySelectorAll('[data-pin-toggle-recipe]').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const recipeId = btn.dataset.pinToggleRecipe;
-      const recipe = allRecipes.find((r) => r.id === recipeId);
-      if (!recipe) return;
-
-      if (isOnHomeScreen(recipe)) {
-        await unpinRecipeFromHome(recipe);
-      } else {
-        await pinRecipeOnHome(recipe);
+        if (isOnHomeScreen(recipe)) await unpinRecipeFromHome(recipe);
+        else await pinRecipeOnHome(recipe);
+        render();
+        return;
       }
-      await loadRecipes();
-      render();
-    });
-  });
 
-  document.querySelectorAll('[data-pin-delete-recipe]').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const recipeId = btn.dataset.pinDeleteRecipe;
-      const recipe = allRecipes.find((r) => r.id === recipeId);
-      if (!recipe) return;
-      if (!confirm(`Delete "${displayName(recipe)}" and all its recipes? This cannot be undone.`)) return;
+      const deleteBtn = e.target.closest('[data-pin-delete-recipe]');
+      if (deleteBtn) {
+        e.stopPropagation();
+        const recipeId = deleteBtn.dataset.pinDeleteRecipe;
+        const recipe = allRecipes.find((r) => r.id === recipeId);
+        if (!recipe) return;
+        if (!confirm(`Delete "${displayName(recipe)}" and all its recipes? This cannot be undone.`)) return;
 
-      await deleteRecipe(currentUser.uid, recipeId);
-      if (view.panel?.recipeId === recipeId) view.panel = null;
-      if (view.pinFlow?.recipeId === recipeId) {
-        view.pinFlow = { step: 'list', filter: view.pinFlow?.filter || 'all', search: view.pinFlow?.search || '' };
+        await deleteRecipe(currentUser.uid, recipeId);
+        removeRecipeFromMemory(recipeId);
+        if (view.panel?.recipeId === recipeId) view.panel = null;
+        render();
+        return;
       }
-      await loadRecipes();
-      render();
+
+      const recipeBtn = e.target.closest('[data-pin-recipe]');
+      if (recipeBtn) {
+        view.pinFlow = {
+          step: 'configure',
+          recipeId: recipeBtn.dataset.pinRecipe,
+          filter: view.pinFlow?.filter || 'all',
+          search: view.pinFlow?.search || '',
+        };
+        render();
+      }
     });
-  });
+
+    return;
+  }
 
   document.querySelectorAll('[data-pin-delete-drink]').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
@@ -603,7 +647,11 @@ function bindPinFlow() {
 
       await updateRecipe(currentUser.uid, recipeId, { methods });
       await saveRecipePin(currentUser.uid, recipeId, pinMethods);
-      await loadRecipes();
+      const hasAny = Object.values(pinMethods).some((drinks) => Array.isArray(drinks) && drinks.length > 0);
+      patchRecipeInMemory(recipeId, {
+        methods,
+        pin: hasAny ? { methods: pinMethods } : undefined,
+      });
 
       if (view.panel?.recipeId === recipeId) {
         const updated = getRecipe(recipeId);
@@ -634,7 +682,8 @@ function bindPinFlow() {
     const recipeId = view.pinFlow.recipeId;
     const pinMethods = buildPinMethodsFromForm(e.target);
     await saveRecipePin(currentUser.uid, recipeId, pinMethods);
-    await loadRecipes();
+    const hasAny = Object.values(pinMethods).some((drinks) => Array.isArray(drinks) && drinks.length > 0);
+    patchRecipeInMemory(recipeId, { pin: hasAny ? { methods: pinMethods } : undefined });
     if (view.panel?.recipeId === recipeId) {
       const recipe = getRecipe(recipeId);
       const { activeMethod, activeDrink } = resolveVisibleSelection(
@@ -1209,6 +1258,7 @@ function bindShell() {
     view.pinFlow = { step: 'list', filter: 'all', search: '' };
     view.reorderMode = false;
     render();
+    refreshRecipesInBackground();
   });
   document.getElementById('btn-reorder')?.addEventListener('click', async () => {
     if (view.reorderMode) {
@@ -1474,7 +1524,6 @@ function bindDetailPanel() {
       if (action === 'unpin') {
         await unpinRecipeFromHome(recipe);
         view.panel = null;
-        await loadRecipes();
         render();
         return;
       }

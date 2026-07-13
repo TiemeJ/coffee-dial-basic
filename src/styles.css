@@ -465,6 +465,34 @@ input {
   margin: 0 -1rem;
   padding-left: 1rem;
   padding-right: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pin-list-virtual-track {
+  position: relative;
+  width: 100%;
+}
+
+.pin-list-virtual-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.pin-list-body-virtual .pin-list-item {
+  height: 58px;
+  min-height: 58px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.pin-list-virtual-section {
+  margin: 0 0 0.4rem;
+}
+
+.pin-list-virtual-section:not(.is-first) {
+  margin-top: 0.85rem;
 }
 
 .pin-list-section[hidden] {
