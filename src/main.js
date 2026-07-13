@@ -2,6 +2,7 @@ import {
   onAuthChange,
   signInWithGoogle,
   fetchAllRecipes,
+  fetchRecipesByIds,
   fetchRecipe,
   createRecipe,
   updateRecipe,
@@ -77,14 +78,16 @@ let beanTemplates = [];
 let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
 let pinVirtualList = null;
 let recipesFetchToken = 0;
+let libraryLoading = false;
 
 onAuthChange(async (user) => {
   currentUser = user;
   if (user) {
     await ensureUserDoc(user.uid, user.displayName);
-    await loadRecipes();
-    render();
+    await loadRecipesStaged();
   } else {
+    recipesFetchToken += 1;
+    libraryLoading = false;
     recipes = [];
     allRecipes = [];
     homeOrder = [];
@@ -93,9 +96,46 @@ onAuthChange(async (user) => {
   }
 });
 
+async function loadRecipesStaged() {
+  if (!currentUser) return;
+  const token = ++recipesFetchToken;
+  libraryLoading = true;
+
+  homeOrder = await fetchHomeOrder(currentUser.uid);
+  const homeRecipes = homeOrder.length
+    ? await fetchRecipesByIds(currentUser.uid, homeOrder)
+    : [];
+
+  if (token !== recipesFetchToken) return;
+
+  allRecipes = homeRecipes;
+  refreshHomeRecipes();
+  render();
+
+  try {
+    const all = await fetchAllRecipes(currentUser.uid);
+    if (token !== recipesFetchToken) return;
+
+    allRecipes = all;
+    refreshHomeRecipes();
+    libraryLoading = false;
+
+    if (view.pinFlow?.step === 'list') {
+      syncPinListCount();
+      pinVirtualList?.update();
+    }
+    render();
+  } catch (err) {
+    libraryLoading = false;
+    console.error(err);
+    render();
+  }
+}
+
 async function loadRecipes() {
   if (!currentUser) return;
   const token = ++recipesFetchToken;
+  libraryLoading = false;
   const [all, order] = await Promise.all([
     fetchAllRecipes(currentUser.uid),
     fetchHomeOrder(currentUser.uid),
@@ -134,6 +174,7 @@ async function refreshRecipesInBackground() {
     if (!recipesSnapshotChanged(allRecipes, all, homeOrder, order)) return;
     allRecipes = all;
     homeOrder = order;
+    libraryLoading = false;
     refreshHomeRecipes();
     if (view.pinFlow?.step === 'list') {
       syncPinListCount();
@@ -417,6 +458,18 @@ function renderPinSectionRow(title, isFirst) {
   return `<h3 class="pin-list-section-title pin-list-virtual-section${isFirst ? ' is-first' : ''}">${escapeHtml(title)}</h3>`;
 }
 
+function pinListCountText(stats, filter, query) {
+  let text = formatPinListCount({
+    visible: stats.visible,
+    total: stats.total,
+    onHomeTotal: stats.onHomeTotal,
+    filter,
+    query,
+  });
+  if (libraryLoading) text += ' · loading library…';
+  return text;
+}
+
 function syncPinListCount() {
   const pinListCount = document.getElementById('pin-list-count');
   if (!pinListCount || view.pinFlow?.step !== 'list') return;
@@ -427,20 +480,18 @@ function syncPinListCount() {
   );
   pinListCount.dataset.total = String(stats.total);
   pinListCount.dataset.onHome = String(stats.onHomeTotal);
-  pinListCount.textContent = formatPinListCount({
-    visible: stats.visible,
-    total: stats.total,
-    onHomeTotal: stats.onHomeTotal,
-    filter: view.pinFlow.filter || 'all',
-    query: view.pinFlow.search || '',
-  });
+  pinListCount.textContent = pinListCountText(
+    stats,
+    view.pinFlow.filter || 'all',
+    view.pinFlow.search || ''
+  );
   const pinListEmpty = document.getElementById('pin-list-empty');
-  if (pinListEmpty) pinListEmpty.hidden = stats.visible > 0;
+  if (pinListEmpty) pinListEmpty.hidden = stats.visible > 0 || libraryLoading;
 }
 
 function renderPinFlow() {
   if (view.pinFlow.step === 'list') {
-    if (allRecipes.length === 0) {
+    if (allRecipes.length === 0 && !libraryLoading) {
       return `
         <div class="panel-backdrop" id="pin-backdrop">
           <div class="pin-panel" role="dialog">
@@ -473,16 +524,10 @@ function renderPinFlow() {
               ${renderPinFilterChips(activeFilter)}
             </div>
             <p class="pin-list-count" id="pin-list-count" data-total="${stats.total}" data-on-home="${stats.onHomeTotal}">
-              ${escapeHtml(formatPinListCount({
-                visible: stats.visible,
-                total: stats.total,
-                onHomeTotal: stats.onHomeTotal,
-                filter: activeFilter,
-                query: searchValue,
-              }))}
+              ${escapeHtml(pinListCountText(stats, activeFilter, searchValue))}
             </p>
           </div>
-          <p class="pin-empty pin-list-empty" id="pin-list-empty"${stats.visible > 0 ? ' hidden' : ''}>No coffees match your search.</p>
+          <p class="pin-empty pin-list-empty" id="pin-list-empty"${stats.visible > 0 || libraryLoading ? ' hidden' : ''}>No coffees match your search.</p>
           <div class="pin-list-body pin-list-body-virtual" id="pin-list-body"></div>
         </div>
       </div>`;

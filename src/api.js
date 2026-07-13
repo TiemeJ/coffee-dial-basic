@@ -13,6 +13,8 @@ import {
   deleteField,
   query,
   orderBy,
+  where,
+  documentId,
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebase.js';
 import { generateCoffeeName, normalizeRecipe, mergeDrinkIntoMethods } from './utils.js';
@@ -53,6 +55,19 @@ export async function fetchOpenRecipes(uid) {
 export async function fetchAllRecipes(uid) {
   const snap = await getDocs(query(recipesRef(uid), orderBy('createdAt', 'desc')));
   return snap.docs.map((d) => normalizeRecipe({ id: d.id, ...d.data() }));
+}
+
+export async function fetchRecipesByIds(uid, ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return [];
+
+  const recipes = [];
+  for (let i = 0; i < unique.length; i += 10) {
+    const chunk = unique.slice(i, i + 10);
+    const snap = await getDocs(query(recipesRef(uid), where(documentId(), 'in', chunk)));
+    snap.docs.forEach((d) => recipes.push(normalizeRecipe({ id: d.id, ...d.data() })));
+  }
+  return recipes;
 }
 
 export async function fetchRecipe(uid, recipeId) {
