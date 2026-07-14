@@ -74,11 +74,22 @@ export const BREWING_METHODS = [
   'Hario Switch',
   'Clever Dripper',
   'Aeropress',
-  'OXO Rapid Brewer',
+  'OXO',
   'French Press',
   'Chemex',
   'Other',
 ];
+
+const METHOD_DISPLAY_NAMES = {
+  'Hario Switch': 'Switch',
+  'Clever Dripper': 'Dripper',
+  'French Press': 'Press',
+};
+
+export function displayMethodName(name) {
+  const value = String(name ?? '').trim();
+  return METHOD_DISPLAY_NAMES[value] || value;
+}
 
 export const DRINKS = [
   'Espresso',
@@ -173,6 +184,80 @@ export function drinkNames(methods, methodName) {
   const drinks = normalized[methodName];
   if (!drinks || typeof drinks !== 'object') return [];
   return Object.keys(drinks).sort((a, b) => a.localeCompare(b));
+}
+
+export function applyNameOrder(names, order) {
+  const unique = [...new Set(names)];
+  if (!Array.isArray(order) || !order.length) {
+    return unique.sort((a, b) => a.localeCompare(b));
+  }
+  const nameSet = new Set(unique);
+  const sorted = order.filter((name) => nameSet.has(name));
+  const rest = unique.filter((name) => !order.includes(name)).sort((a, b) => a.localeCompare(b));
+  return [...sorted, ...rest];
+}
+
+export function orderedMethodNames(recipe) {
+  return applyNameOrder(Object.keys(normalizeMethods(recipe?.methods)), recipe?.methodOrder);
+}
+
+export function orderedDrinkNames(recipe, methodName) {
+  const normalized = normalizeMethods(recipe?.methods);
+  const names = Object.keys(normalized[methodName] || {});
+  return applyNameOrder(names, recipe?.drinkOrder?.[methodName]);
+}
+
+export function mergeVisibleOrder(allNames, savedOrder, newVisibleOrder, visibleNames) {
+  const visibleSet = new Set(visibleNames);
+  const baseOrder = applyNameOrder(allNames, savedOrder);
+  const result = [];
+  let vi = 0;
+  for (const name of baseOrder) {
+    if (visibleSet.has(name)) {
+      if (vi < newVisibleOrder.length) result.push(newVisibleOrder[vi++]);
+    } else {
+      result.push(name);
+    }
+  }
+  while (vi < newVisibleOrder.length) {
+    const name = newVisibleOrder[vi++];
+    if (!result.includes(name)) result.push(name);
+  }
+  for (const name of allNames) {
+    if (!result.includes(name)) result.push(name);
+  }
+  return result;
+}
+
+export function appendToNameOrder(order, name) {
+  const next = Array.isArray(order) ? order.filter((n) => n !== name) : [];
+  next.push(name);
+  return next;
+}
+
+export function renameInNameOrder(order, oldName, newName) {
+  if (!Array.isArray(order)) return [newName];
+  return order.map((n) => (n === oldName ? newName : n));
+}
+
+export function removeFromNameOrder(order, name) {
+  if (!Array.isArray(order)) return [];
+  return order.filter((n) => n !== name);
+}
+
+export function renameMethodInDrinkOrder(drinkOrder, oldMethod, newMethod) {
+  if (!drinkOrder || !drinkOrder[oldMethod]) return drinkOrder;
+  const next = { ...drinkOrder };
+  next[newMethod] = next[oldMethod];
+  delete next[oldMethod];
+  return next;
+}
+
+export function removeMethodFromDrinkOrder(drinkOrder, methodName) {
+  if (!drinkOrder?.[methodName]) return drinkOrder;
+  const next = { ...drinkOrder };
+  delete next[methodName];
+  return next;
 }
 
 export function beanFingerprint(data) {
@@ -310,24 +395,24 @@ export function getPinnedPairs(recipe) {
 }
 
 export function visibleMethodNames(recipe) {
+  const ordered = orderedMethodNames(recipe);
   if (hasActivePin(recipe)) {
-    return [...new Set(getPinnedPairs(recipe).map((p) => p.method))].sort((a, b) =>
-      a.localeCompare(b)
-    );
+    const pinned = new Set(getPinnedPairs(recipe).map((p) => p.method));
+    return ordered.filter((method) => pinned.has(method));
   }
-  return methodNames(recipe?.methods);
+  return ordered;
 }
 
 export function visibleDrinkNames(recipe, methodName) {
+  const ordered = orderedDrinkNames(recipe, methodName);
   if (hasActivePin(recipe)) {
     const drinks = recipe?.pin?.methods?.[methodName];
     if (!Array.isArray(drinks)) return [];
+    const pinned = new Set(drinks);
     const normalized = normalizeMethods(recipe?.methods);
-    return drinks
-      .filter((drink) => normalized[methodName]?.[drink])
-      .sort((a, b) => a.localeCompare(b));
+    return ordered.filter((drink) => pinned.has(drink) && normalized[methodName]?.[drink]);
   }
-  return drinkNames(recipe?.methods, methodName);
+  return ordered;
 }
 
 export function resolveVisibleSelection(recipe, methodName = null, drinkName = null) {
@@ -357,8 +442,8 @@ export function buildPinMethodsFromForm(form) {
 export function buildFullPinMethods(recipe) {
   const normalized = normalizeMethods(recipe?.methods);
   const pinMethods = {};
-  for (const method of Object.keys(normalized)) {
-    const drinks = drinkNames(normalized, method);
+  for (const method of orderedMethodNames(recipe)) {
+    const drinks = orderedDrinkNames(recipe, method);
     if (drinks.length) pinMethods[method] = drinks;
   }
   return pinMethods;
@@ -416,11 +501,18 @@ export function emptyMethod() {
   return emptyDrinkParams();
 }
 
+export function formatRatioNumber(value) {
+  const n = parseFloat(String(value).replace(',', '.'));
+  if (Number.isNaN(n)) return '';
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 export function computeRatio(dose, out) {
   const d = parseFloat(String(dose).replace(',', '.'));
   const o = parseFloat(String(out).replace(',', '.'));
   if (d > 0 && o > 0) {
-    return (o / d).toFixed(2).replace(/\.?0+$/, '');
+    return formatRatioNumber(o / d);
   }
   return '';
 }
@@ -437,9 +529,14 @@ export function formatRatio(method) {
   if (computed) return `1:${computed}`;
   if (method.ratio) {
     const r = String(method.ratio).trim();
-    if (r.includes(':')) return r.startsWith('1:') ? r : `1:${r}`;
+    if (r.includes(':')) {
+      const numPart = r.split(':').pop();
+      const formatted = formatRatioNumber(numPart);
+      if (formatted) return `1:${formatted}`;
+      return r.startsWith('1:') ? r : `1:${r}`;
+    }
     const n = parseFloat(r);
-    if (!Number.isNaN(n)) return `1:${n.toFixed(2).replace(/\.?0+$/, '')}`;
+    if (!Number.isNaN(n)) return `1:${formatRatioNumber(n)}`;
     return r;
   }
   return '—';

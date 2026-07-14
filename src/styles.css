@@ -934,6 +934,15 @@ input {
   width: 100%;
 }
 
+.recipe-panel-view .method-tab,
+.recipe-panel-view .drink-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-align: center;
+}
+
 .panel-tab-slot .method-single {
   margin-bottom: 0;
   width: 100%;
@@ -980,6 +989,62 @@ input {
   align-items: center;
   gap: 0.35rem;
   flex-shrink: 0;
+}
+
+.panel-actions .btn-reorder-header {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.panel-actions .btn-reorder-header:hover {
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.panel-actions .btn-reorder-header.btn-reorder-ok {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+}
+
+.panel-actions .btn-reorder-header.btn-reorder-ok:hover {
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.panel-tabs-reorder-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0 0 0.5rem;
+}
+
+.panel-tabs-reorder-mode .method-tab,
+.panel-tabs-reorder-mode .drink-tab {
+  cursor: grab;
+  user-select: none;
+}
+
+.panel-tabs-reorder-mode .method-tab:active,
+.panel-tabs-reorder-mode .drink-tab:active,
+.panel-tabs-reorder-mode .tab-dragging {
+  cursor: grabbing;
+}
+
+.tab-dragging {
+  opacity: 1;
+  z-index: 2;
+  scale: 1.05;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.tab-moving {
+  z-index: 1;
 }
 
 .panel-action-btn {
@@ -1070,24 +1135,22 @@ input {
 
 .drink-tab {
   flex-shrink: 0;
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: 0;
+  font-size: 0.85rem;
   font-weight: 600;
   background: transparent;
   color: var(--text-muted);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 
 .drink-tab:hover {
-  border-color: rgba(255, 255, 255, 0.22);
   color: var(--text);
 }
 
 .drink-tab.active {
-  background: rgba(196, 149, 106, 0.2);
-  border-color: var(--accent);
+  background: transparent;
   color: var(--accent);
 }
 
@@ -1133,15 +1196,13 @@ input {
 }
 
 .brew-stats-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 0.85rem;
+  text-align: center;
 }
 
 .stat-cards {
@@ -1183,21 +1244,6 @@ input {
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.2;
-}
-
-.stat-card-temp .stat-value {
-  font-size: 1rem;
-}
-
-.temp-badge {
-  display: inline-block;
-  background: rgba(212, 141, 95, 0.18);
-  color: #d48d5f;
-  padding: 0.2rem 0.55rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  border: 1px solid rgba(212, 141, 95, 0.25);
 }
 
 /* Notes / Improve collapsible boxes */
@@ -2091,11 +2137,6 @@ input {
 
   .stat-value {
     font-size: 0.92rem;
-  }
-
-  .stat-card-temp .stat-value,
-  .temp-badge {
-    font-size: 0.85rem;
   }
 
   .note-boxes {
