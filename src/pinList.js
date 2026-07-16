@@ -1,6 +1,6 @@
 import { displayName, isOnHomeScreen, recipeSearchText } from './utils.js';
 
-const ITEM_HEIGHT = 64;
+const ITEM_HEIGHT = 52;
 const SECTION_HEIGHT = 32;
 const SECTION_GAP = 14;
 const BUFFER_ROWS = 6;

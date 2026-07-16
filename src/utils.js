@@ -12,12 +12,36 @@ const METHOD_FIELDS = [
   { key: 'rating', label: 'Rating', type: 'number' },
 ];
 
+/** Blend value, with legacy fallbacks (old "Blend / farmer" or coffee name). */
+export function recipeBlend(recipe) {
+  if (recipe?.blend?.trim()) return recipe.blend.trim();
+  if (recipe?.farmer?.trim()) return recipe.farmer.trim();
+  const name = recipe?.name?.trim() || '';
+  if (!name) return '';
+  if (name.includes(' - ')) return name.split(' - ')[0].trim();
+  return name;
+}
+
+/** Farmer value — only when `blend` is stored separately (new model). */
+export function recipeFarmer(recipe) {
+  if (recipe?.blend?.trim()) return recipe?.farmer?.trim() || '';
+  return '';
+}
+
+export function generateCoffeeName(data) {
+  const blend = recipeBlend(data);
+  const roaster = data?.roaster?.trim() || '';
+  if (blend && roaster) return `${blend} - ${roaster}`;
+  if (blend) return blend;
+  if (roaster) return roaster;
+  return '';
+}
+
 export function displayName(recipe) {
   return (
+    recipeBlend(recipe) ||
     recipe.name?.trim() ||
     recipe.variety?.trim() ||
-    recipe.roaster?.trim() ||
-    recipe.farmer?.trim() ||
     'Untitled'
   );
 }
@@ -25,13 +49,12 @@ export function displayName(recipe) {
 export function displaySubtitle(recipe) {
   const roaster = recipe.roaster?.trim();
   if (roaster && roaster !== displayName(recipe)) return roaster;
-  const name = recipe.name?.trim();
-  const farmer = recipe.farmer?.trim();
-  if (name && farmer && name !== farmer) return farmer;
+  const farmer = recipeFarmer(recipe);
+  if (farmer) return farmer;
   return recipe.origin?.trim() || '';
 }
 
-const COFFEE_INFO_FIELDS = ['name', 'roaster', 'farmer', 'origin', 'variety', 'processing', 'roastType'];
+const COFFEE_INFO_FIELDS = ['name', 'blend', 'roaster', 'farmer', 'origin', 'variety', 'processing', 'roastType'];
 
 export function isDecafCoffee(recipe) {
   return COFFEE_INFO_FIELDS.some((field) => String(recipe?.[field] ?? '').toLowerCase().includes('decaf'));
@@ -44,6 +67,7 @@ export function recipeSearchText(recipe) {
     displayName(recipe),
     displaySubtitle(recipe),
     recipe?.name,
+    recipe?.blend,
     recipe?.roaster,
     recipe?.farmer,
     recipe?.origin,
@@ -56,14 +80,6 @@ export function recipeSearchText(recipe) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-}
-
-export function generateCoffeeName(data) {
-  if (data.name?.trim()) return data.name.trim();
-  const parts = [data.variety, data.farmer, data.origin].map((s) => s?.trim()).filter(Boolean);
-  if (parts.length) return parts.join(' · ');
-  if (data.roaster?.trim()) return data.roaster.trim();
-  return '';
 }
 
 export const ROAST_TYPES = ['Light', 'Medium', 'Medium-Dark', 'Dark'];
@@ -122,16 +138,24 @@ export function resolvePresetValue(preset, custom) {
 }
 
 export function beanFieldsFromRecipe(recipe) {
-  const hasRoaster = Boolean(recipe.roaster?.trim());
   return {
-    name: recipe.name || '',
-    roaster: recipe.roaster || recipe.farmer || '',
-    farmer: hasRoaster ? recipe.farmer || '' : '',
+    blend: recipeBlend(recipe),
+    roaster: recipe.roaster || '',
+    farmer: recipeFarmer(recipe),
     origin: recipe.origin || '',
     variety: recipe.variety || '',
     processing: recipe.processing || '',
     roastType: recipe.roastType || '',
+    roasterUrl: recipe.roasterUrl || '',
   };
+}
+
+/** Normalize a pasted URL for storage / opening (adds https:// when missing). */
+export function normalizeRoasterUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
 }
 
 const DRINK_PARAM_KEYS = ['dose', 'out', 'grind', 'time', 'temp', 'gear', 'ratio', 'notes', 'improve', 'rating'];
@@ -261,8 +285,9 @@ export function removeMethodFromDrinkOrder(drinkOrder, methodName) {
 }
 
 export function beanFingerprint(data) {
-  const name = data.name?.trim() || generateCoffeeName(data);
-  return [name, data.roaster, data.farmer, data.origin, data.variety, data.processing, data.roastType]
+  const blend = data.blend?.trim() || recipeBlend(data);
+  const farmer = data.blend?.trim() ? data.farmer?.trim() || '' : recipeFarmer(data);
+  return [blend, data.roaster, farmer, data.origin, data.variety, data.processing, data.roastType]
     .map((s) => String(s || '').trim().toLowerCase())
     .join('|');
 }

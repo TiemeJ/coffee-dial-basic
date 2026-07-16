@@ -17,6 +17,9 @@ import {
   displayName,
   displaySubtitle,
   displayMethodName,
+  recipeBlend,
+  recipeFarmer,
+  normalizeRoasterUrl,
   methodNames,
   drinkNames,
   getDrinkParams,
@@ -463,15 +466,12 @@ function renderHome() {
 }
 
 function renderPinListItem(recipe) {
-  const methods = methodNames(recipe.methods);
-  const drinkCount = methods.reduce((n, m) => n + drinkNames(recipe.methods, m).length, 0);
   const onHome = isOnHomeScreen(recipe);
   return `
     <div class="pin-list-item${onHome ? ' pin-list-item-on-home' : ''}" data-search-text="${escapeHtml(recipeSearchText(recipe))}" data-on-home="${onHome ? '1' : '0'}">
       <button type="button" class="pin-list-main" data-pin-recipe="${escapeHtml(recipe.id)}">
         <span class="pin-list-name">${escapeHtml(displayName(recipe))}</span>
         ${displaySubtitle(recipe) ? `<span class="pin-list-sub">${escapeHtml(displaySubtitle(recipe))}</span>` : ''}
-        <span class="pin-list-meta">${methods.length} method${methods.length === 1 ? '' : 's'} · ${drinkCount} drink${drinkCount === 1 ? '' : 's'}</span>
       </button>
       <button type="button" class="pin-list-toggle${onHome ? ' is-unpin' : ''}" data-pin-toggle-recipe="${escapeHtml(recipe.id)}" title="${onHome ? 'Remove from home screen' : 'Add to home screen'}" aria-label="${onHome ? 'Unpin coffee' : 'Pin coffee'}">${onHome ? 'Unpin' : 'Pin'}</button>
       <button type="button" class="pin-list-delete" data-pin-delete-recipe="${escapeHtml(recipe.id)}" title="Delete coffee" aria-label="Delete coffee">Delete</button>
@@ -497,14 +497,8 @@ function renderPinSectionRow(title, isFirst) {
 }
 
 function pinListCountText(stats, filter, query) {
-  let text = formatPinListCount({
-    visible: stats.visible,
-    total: stats.total,
-    onHomeTotal: stats.onHomeTotal,
-    filter,
-    query,
-  });
-  if (libraryLoading) text += ' · loading library…';
+  let text = 'Tap a coffee to view its methods and drinks.';
+  if (libraryLoading) text += ' Library is still loading…';
   return text;
 }
 
@@ -574,6 +568,10 @@ function renderPinFlow() {
   const recipe = allRecipes.find((r) => r.id === view.pinFlow.recipeId);
   if (!recipe) return '';
 
+  if (view.pinFlow.step === 'view') {
+    return renderPinRecipeView(recipe);
+  }
+
   const methods = orderedMethodNames(recipe);
   const sections = methods
     .map((method) => {
@@ -586,6 +584,7 @@ function renderPinFlow() {
             <input type="checkbox" data-pin-method="${escapeHtml(method)}" data-pin-drink="${escapeHtml(drink)}" ${isPinChecked(recipe, method, drink) ? 'checked' : ''} />
             <span>${escapeHtml(drink)}</span>
           </label>
+          <button type="button" class="pin-view-drink" data-pin-view-method="${escapeHtml(method)}" data-pin-view-drink="${escapeHtml(drink)}" title="View recipe" aria-label="View ${escapeHtml(drink)}">View</button>
           <button type="button" class="pin-delete-drink" data-pin-delete-method="${escapeHtml(method)}" data-pin-delete-drink="${escapeHtml(drink)}" title="Delete drink" aria-label="Delete ${escapeHtml(drink)}">Delete</button>
         </div>`
         )
@@ -616,6 +615,151 @@ function renderPinFlow() {
             <button type="submit" class="btn btn-save">Save pin</button>
           </footer>
         </form>
+      </div>
+    </div>`;
+}
+
+function renderPinRecipeView(recipe) {
+  const methodName = view.pinFlow.methodName || '';
+  const drinkName = view.pinFlow.drinkName || '';
+  const drink = methodName && drinkName ? getDrinkParams(recipe, methodName, drinkName) : null;
+  const data = drink ? { ...emptyDrinkParams(), ...drink } : emptyDrinkParams();
+  const ratioDisplay = formatRatioDisplay(data.dose, data.out, data.ratio);
+  const roasterUrl = normalizeRoasterUrl(recipe.roasterUrl);
+
+  return `
+    <div class="panel-backdrop" id="pin-backdrop">
+      <div class="recipe-panel recipe-panel-edit pin-recipe-view" role="dialog">
+        <header class="edit-topbar">
+          <h2 class="edit-topbar-title">View Recipe</h2>
+          <button type="button" class="panel-action-btn" id="pin-close" title="Close">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </header>
+
+        <div class="edit-form">
+          <details class="edit-section">
+            <summary class="edit-section-head">
+              <span class="edit-section-label">Coffee</span>
+              <span class="edit-section-chevron">▾</span>
+            </summary>
+            <div class="edit-section-body">
+              <div class="edit-grid-3">
+                <label class="edit-field">
+                  <span>Blend</span>
+                  <input type="text" value="${escapeHtml(recipeBlend(recipe))}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Roaster</span>
+                  <input type="text" value="${escapeHtml(recipe.roaster || '')}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Farmer</span>
+                  <input type="text" value="${escapeHtml(recipeFarmer(recipe))}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Origin</span>
+                  <input type="text" value="${escapeHtml(recipe.origin || '')}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Variety</span>
+                  <input type="text" value="${escapeHtml(recipe.variety || '')}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Processing</span>
+                  <input type="text" value="${escapeHtml(recipe.processing || '')}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Roast type</span>
+                  <input type="text" value="${escapeHtml(recipe.roastType || '')}" readonly />
+                </label>
+                <label class="edit-field edit-field-span-2">
+                  <span>Roaster URL</span>
+                  ${
+                    roasterUrl
+                      ? `<a class="edit-field-link" href="${escapeHtml(roasterUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(recipe.roasterUrl || roasterUrl)}</a>`
+                      : `<input type="text" value="" readonly />`
+                  }
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="edit-section">
+            <summary class="edit-section-head">
+              <span class="edit-section-label">Extraction</span>
+              <span class="edit-section-chevron">▾</span>
+            </summary>
+            <div class="edit-section-body">
+              <label class="edit-field">
+                <span>Brewing method</span>
+                <input type="text" value="${escapeHtml(methodName)}" readonly />
+              </label>
+              <div class="edit-grid-inline-2 edit-grid-spaced">
+                <label class="edit-field">
+                  <span>Drink</span>
+                  <input type="text" value="${escapeHtml(drinkName)}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Gear</span>
+                  <input type="text" value="${escapeHtml(String(data.gear || ''))}" readonly />
+                </label>
+              </div>
+              <div class="edit-grid-inline-3 edit-grid-spaced">
+                <label class="edit-field">
+                  <span>Grind size</span>
+                  <input type="text" value="${escapeHtml(String(data.grind || ''))}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Temp</span>
+                  <input type="text" value="${escapeHtml(formatTempDisplay(data.temp))}" readonly />
+                </label>
+                <label class="edit-field">
+                  <span>Time (sec)</span>
+                  <input type="text" value="${escapeHtml(formatTimeDisplay(data.time))}" readonly />
+                </label>
+              </div>
+              <div class="dose-row">
+                <label class="edit-field dose-field">
+                  <span>In (g)</span>
+                  <input type="text" value="${escapeHtml(formatStatValue('dose', data.dose))}" readonly />
+                </label>
+                <div class="ratio-display" aria-live="polite">${escapeHtml(ratioDisplay)}</div>
+                <label class="edit-field dose-field">
+                  <span>Out (g)</span>
+                  <input type="text" value="${escapeHtml(formatStatValue('out', data.out))}" readonly />
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="edit-section">
+            <summary class="edit-section-head">
+              <span class="edit-section-label">Cupping</span>
+              <span class="edit-section-chevron">▾</span>
+            </summary>
+            <div class="edit-section-body">
+              <div class="edit-field">
+                <span>Rating</span>
+                <div class="panel-stars">${renderStars(data.rating)}</div>
+              </div>
+              <label class="edit-field">
+                <span>Tasting notes</span>
+                <textarea rows="3" readonly>${escapeHtml(String(data.notes || ''))}</textarea>
+              </label>
+              <label class="edit-field">
+                <span>Improve</span>
+                <textarea rows="2" readonly>${escapeHtml(String(data.improve || ''))}</textarea>
+              </label>
+            </div>
+          </details>
+
+          <footer class="edit-footer">
+            <div class="edit-footer-actions">
+              <button type="button" class="edit-footer-discard" id="pin-view-back">Back</button>
+            </div>
+          </footer>
+        </div>
       </div>
     </div>`;
 }
@@ -713,6 +857,21 @@ function bindPinFlow() {
     return;
   }
 
+  document.querySelectorAll('[data-pin-view-drink]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      view.pinFlow = {
+        step: 'view',
+        recipeId: view.pinFlow.recipeId,
+        methodName: btn.dataset.pinViewMethod,
+        drinkName: btn.dataset.pinViewDrink,
+        filter: view.pinFlow?.filter || 'all',
+        search: view.pinFlow?.search || '',
+      };
+      render();
+    });
+  });
+
   document.querySelectorAll('[data-pin-delete-drink]').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -762,6 +921,16 @@ function bindPinFlow() {
 
   document.getElementById('pin-back')?.addEventListener('click', () => {
     view.pinFlow = { step: 'list', filter: view.pinFlow?.filter || 'all', search: view.pinFlow?.search || '' };
+    render();
+  });
+
+  document.getElementById('pin-view-back')?.addEventListener('click', () => {
+    view.pinFlow = {
+      step: 'configure',
+      recipeId: view.pinFlow.recipeId,
+      filter: view.pinFlow?.filter || 'all',
+      search: view.pinFlow?.search || '',
+    };
     render();
   });
 
@@ -992,16 +1161,16 @@ function renderPanelEdit(recipe) {
             <div class="edit-section-body">
               <div class="edit-grid-3">
                 <label class="edit-field">
-                  <span>Coffee name</span>
-                  <input type="text" name="coffeeName" value="${escapeHtml(recipe.name || '')}" placeholder="Auto from bean info" />
+                  <span>Blend</span>
+                  <input type="text" name="coffeeBlend" value="${escapeHtml(recipeBlend(recipe))}" placeholder="e.g. Nosegrind" />
                 </label>
                 <label class="edit-field">
                   <span>Roaster</span>
-                  <input type="text" name="coffeeRoaster" value="${escapeHtml(recipe.roaster || recipe.farmer || '')}" />
+                  <input type="text" name="coffeeRoaster" value="${escapeHtml(recipe.roaster || '')}" placeholder="e.g. LOT61" />
                 </label>
                 <label class="edit-field">
-                  <span>Blend / farmer</span>
-                  <input type="text" name="coffeeFarmer" value="${escapeHtml(recipe.roaster ? recipe.farmer || '' : '')}" />
+                  <span>Farmer</span>
+                  <input type="text" name="coffeeFarmer" value="${escapeHtml(recipeFarmer(recipe))}" placeholder="e.g. Felipe Arcila" />
                 </label>
                 <label class="edit-field">
                   <span>Origin</span>
@@ -1021,6 +1190,10 @@ function renderPanelEdit(recipe) {
                     <option value="">Select roast</option>
                     ${ROAST_TYPES.map((r) => `<option value="${r}" ${recipe.roastType === r ? 'selected' : ''}>${r}</option>`).join('')}
                   </select>
+                </label>
+                <label class="edit-field edit-field-span-2">
+                  <span>Roaster URL <span class="field-hint">(optional)</span></span>
+                  <input type="url" name="coffeeRoasterUrl" value="${escapeHtml(recipe.roasterUrl || '')}" placeholder="https://…" inputmode="url" />
                 </label>
               </div>
             </div>
@@ -1162,19 +1335,23 @@ function renderAddForm() {
             </p>
             <div class="edit-grid-3 edit-grid-spaced">
               <label class="edit-field">
-                <span>Roaster</span>
-                <input type="text" name="roaster" data-bean-field placeholder="e.g. La Cabra" />
+                <span>Blend</span>
+                <input type="text" name="blend" data-bean-field placeholder="e.g. Nosegrind" />
               </label>
               <label class="edit-field">
-                <span>Blend / farmer</span>
+                <span>Roaster</span>
+                <input type="text" name="roaster" data-bean-field placeholder="e.g. LOT61" />
+              </label>
+              <label class="edit-field">
+                <span>Farmer</span>
                 <input type="text" name="farmer" data-bean-field placeholder="e.g. Felipe Arcila" />
               </label>
+            </div>
+            <div class="edit-grid-3 edit-grid-spaced">
               <label class="edit-field">
                 <span>Origin</span>
                 <input type="text" name="origin" data-bean-field placeholder="e.g. Ethiopia" />
               </label>
-            </div>
-            <div class="edit-grid-3 edit-grid-spaced">
               <label class="edit-field">
                 <span>Variety</span>
                 <input type="text" name="variety" data-bean-field placeholder="e.g. Geisha" />
@@ -1183,6 +1360,8 @@ function renderAddForm() {
                 <span>Processing</span>
                 <input type="text" name="processing" data-bean-field placeholder="e.g. Natural" />
               </label>
+            </div>
+            <div class="edit-grid-3 edit-grid-spaced">
               <label class="edit-field">
                 <span>Roast type</span>
                 <select name="roastType" data-bean-field class="edit-select">
@@ -1192,8 +1371,8 @@ function renderAddForm() {
               </label>
             </div>
             <label class="edit-field edit-grid-spaced">
-              <span>Coffee name <span class="field-hint">(optional — auto-generated if empty)</span></span>
-              <input type="text" name="name" data-bean-field placeholder="e.g. Nosegrind" />
+              <span>Roaster URL <span class="field-hint">(optional)</span></span>
+              <input type="url" name="roasterUrl" data-bean-field placeholder="https://…" inputmode="url" />
             </label>
           </div>
         </details>
@@ -1930,29 +2109,27 @@ function bindPanelEdit(recipe) {
     }
 
     const coffeeUpdates = {};
-    const coffeeName = String(fd.get('coffeeName') ?? '').trim();
+    const coffeeBlend = String(fd.get('coffeeBlend') ?? '').trim();
     const coffeeRoaster = String(fd.get('coffeeRoaster') ?? '').trim();
     const coffeeFarmer = String(fd.get('coffeeFarmer') ?? '').trim();
     const coffeeOrigin = String(fd.get('coffeeOrigin') ?? '').trim();
     const coffeeVariety = String(fd.get('coffeeVariety') ?? '').trim();
     const coffeeProcessing = String(fd.get('coffeeProcessing') ?? '').trim();
     const coffeeRoastType = String(fd.get('coffeeRoastType') ?? '').trim();
-    if (coffeeName) coffeeUpdates.name = coffeeName;
-    if (coffeeRoaster) coffeeUpdates.roaster = coffeeRoaster;
-    if (coffeeFarmer) coffeeUpdates.farmer = coffeeFarmer;
-    if (coffeeOrigin) coffeeUpdates.origin = coffeeOrigin;
-    if (coffeeVariety) coffeeUpdates.variety = coffeeVariety;
-    if (coffeeProcessing) coffeeUpdates.processing = coffeeProcessing;
-    if (coffeeRoastType) coffeeUpdates.roastType = coffeeRoastType;
-    if (!coffeeUpdates.name) {
-      coffeeUpdates.name = generateCoffeeName({
-        name: coffeeName,
-        roaster: coffeeRoaster,
-        farmer: coffeeFarmer,
-        origin: coffeeOrigin,
-        variety: coffeeVariety,
-      });
-    }
+    const coffeeRoasterUrl = normalizeRoasterUrl(fd.get('coffeeRoasterUrl'));
+    coffeeUpdates.blend = coffeeBlend;
+    coffeeUpdates.roaster = coffeeRoaster;
+    coffeeUpdates.farmer = coffeeFarmer;
+    coffeeUpdates.origin = coffeeOrigin;
+    coffeeUpdates.variety = coffeeVariety;
+    coffeeUpdates.processing = coffeeProcessing;
+    coffeeUpdates.roastType = coffeeRoastType;
+    coffeeUpdates.roasterUrl = coffeeRoasterUrl;
+    coffeeUpdates.name = generateCoffeeName({
+      blend: coffeeBlend,
+      roaster: coffeeRoaster,
+      farmer: coffeeFarmer,
+    });
 
     const isAddingDrink = view.panel.addMode === 'drink';
     const prevDrinkForSave = isAddingDrink || view.panel.addMode === 'method' ? null : prevDrink;
@@ -1973,7 +2150,9 @@ function bindPanelEdit(recipe) {
       recipeUpdates.pin = appendToPin(recipe.pin, methodName, drinkName);
     }
 
-    let methodOrder = recipe.methodOrder;
+    let methodOrder = Array.isArray(recipe.methodOrder)
+      ? [...recipe.methodOrder]
+      : orderedMethodNames(recipe);
     let drinkOrder = { ...(recipe.drinkOrder || {}) };
     if (addMode === 'method' && methodName) {
       methodOrder = appendToNameOrder(methodOrder, methodName);
@@ -1983,7 +2162,7 @@ function bindPanelEdit(recipe) {
     }
     if (methodRenamed) {
       methodOrder = renameInNameOrder(methodOrder, prevMethod, methodName);
-      drinkOrder = renameMethodInDrinkOrder(drinkOrder, prevMethod, methodName);
+      drinkOrder = renameMethodInDrinkOrder(drinkOrder, prevMethod, methodName) || {};
     }
     if (!addMode && prevDrink && prevDrink !== drinkName && methodName) {
       drinkOrder[methodName] = renameInNameOrder(drinkOrder[methodName], prevDrink, drinkName);
@@ -2113,13 +2292,14 @@ function bindAddForm() {
     const fd = new FormData(e.target);
 
     const beanData = {
-      name: String(fd.get('name') ?? '').trim(),
+      blend: String(fd.get('blend') ?? '').trim(),
       roaster: String(fd.get('roaster') ?? '').trim(),
       farmer: String(fd.get('farmer') ?? '').trim(),
       origin: String(fd.get('origin') ?? '').trim(),
       variety: String(fd.get('variety') ?? '').trim(),
       processing: String(fd.get('processing') ?? '').trim(),
       roastType: String(fd.get('roastType') ?? '').trim(),
+      roasterUrl: normalizeRoasterUrl(fd.get('roasterUrl')),
     };
 
     const methodName = readPresetFromForm(fd, 'methodPreset', 'methodCustom');

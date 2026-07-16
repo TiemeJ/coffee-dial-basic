@@ -77,11 +77,16 @@ export async function fetchRecipe(uid, recipeId) {
 }
 
 export async function createRecipe(uid, data) {
-  const name = data.name?.trim() || generateCoffeeName(data);
+  const blend = data.blend || '';
+  const roaster = data.roaster || '';
+  const farmer = data.farmer || '';
+  const name = generateCoffeeName({ blend, roaster, farmer });
   const payload = {
     name,
-    roaster: data.roaster || '',
-    farmer: data.farmer || '',
+    blend,
+    roaster,
+    farmer,
+    roasterUrl: data.roasterUrl || '',
     origin: data.origin || '',
     variety: data.variety || '',
     processing: data.processing || '',

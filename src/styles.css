@@ -481,8 +481,8 @@ input {
 }
 
 .pin-list-body-virtual .pin-list-item {
-  height: 58px;
-  min-height: 58px;
+  height: 52px;
+  min-height: 52px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -668,7 +668,8 @@ input {
 }
 
 .pin-list-delete,
-.pin-delete-drink {
+.pin-delete-drink,
+.pin-view-drink {
   flex-shrink: 0;
   min-height: 2rem;
   padding: 0 0.55rem;
@@ -686,9 +687,39 @@ input {
   align-self: center;
 }
 
+.pin-view-drink {
+  color: var(--accent);
+}
+
 .pin-list-delete:hover,
 .pin-delete-drink:hover {
   background: rgba(196, 92, 92, 0.12);
+}
+
+.pin-view-drink:hover {
+  background: rgba(176, 137, 104, 0.12);
+}
+
+.edit-field-link {
+  display: block;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-input);
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.edit-field-link:hover {
+  text-decoration: underline;
+}
+
+.pin-recipe-view input[readonly],
+.pin-recipe-view textarea[readonly] {
+  opacity: 0.95;
+  cursor: default;
 }
 
 .pin-list-name {
@@ -703,14 +734,6 @@ input {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.55);
   margin-top: 0.1rem;
-  line-height: 1.2;
-}
-
-.pin-list-meta {
-  display: block;
-  font-size: 0.66rem;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 0.15rem;
   line-height: 1.2;
 }
 
@@ -966,6 +989,23 @@ input {
   color: var(--text-muted);
   font-size: 0.9rem;
   margin-top: 0.15rem;
+}
+
+.panel-roaster-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.panel-roaster-link:hover {
+  text-decoration: underline;
+}
+
+.edit-field-span-2 {
+  grid-column: span 2;
 }
 
 .panel-stars {
@@ -2166,7 +2206,8 @@ input {
   }
 
   .pin-list-delete,
-  .pin-delete-drink {
+  .pin-delete-drink,
+  .pin-view-drink {
     font-size: 0.62rem;
   }
 
@@ -2204,6 +2245,10 @@ input {
   .edit-grid-3,
   .edit-grid-2 {
     grid-template-columns: 1fr;
+  }
+
+  .edit-field-span-2 {
+    grid-column: span 1;
   }
 
   .edit-grid-inline-2 {
