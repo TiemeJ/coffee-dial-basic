@@ -65,13 +65,23 @@ function findRowAtOffset(starts, offset) {
 }
 
 export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, renderItem, renderSection }) {
+  if (!bodyEl) {
+    return {
+      update() {},
+      getVisibleCount() {
+        return 0;
+      },
+      destroy() {},
+    };
+  }
+
   let rows = [];
   let layout = [0];
   let rafId = 0;
+  let resizeObserver = null;
 
   const paint = () => {
     rafId = 0;
-    if (!bodyEl) return;
 
     const { rows: nextRows, visible } = buildPinListRows(getRecipes(), getFilter(), getQuery());
     rows = nextRows;
@@ -118,6 +128,10 @@ export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, 
 
   const onScroll = () => schedulePaint();
   bodyEl.addEventListener('scroll', onScroll, { passive: true });
+  if (typeof ResizeObserver === 'function') {
+    resizeObserver = new ResizeObserver(() => schedulePaint());
+    resizeObserver.observe(bodyEl);
+  }
 
   return {
     update({ resetScroll = false } = {}) {
@@ -129,6 +143,7 @@ export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, 
     },
     destroy() {
       if (rafId) cancelAnimationFrame(rafId);
+      resizeObserver?.disconnect();
       bodyEl.removeEventListener('scroll', onScroll);
     },
   };

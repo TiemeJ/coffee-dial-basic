@@ -411,6 +411,10 @@ input {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.pin-panel-list {
+  height: min(85vh, 44rem);
+}
+
 .pin-toolbar {
   position: sticky;
   top: 0;
@@ -2106,6 +2110,11 @@ input {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .pin-panel-list {
+    height: 92vh;
+    height: 92dvh;
   }
 
   .recipe-panel-view {

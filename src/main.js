@@ -108,6 +108,24 @@ onAuthChange(async (user) => {
   }
 });
 
+function mergeRecipeLists(primary, secondary) {
+  const byId = new Map();
+  for (const recipe of secondary || []) {
+    if (recipe?.id) byId.set(recipe.id, recipe);
+  }
+  for (const recipe of primary || []) {
+    if (recipe?.id) byId.set(recipe.id, recipe);
+  }
+  return [...byId.values()];
+}
+
+function applyLibraryRecipes(recipes, order = homeOrder) {
+  allRecipes = mergeRecipeLists(recipes, allRecipes);
+  homeOrder = order;
+  libraryLoading = false;
+  refreshHomeRecipes();
+}
+
 async function loadRecipesStaged() {
   if (!currentUser) return;
   const token = ++recipesFetchToken;
@@ -128,14 +146,7 @@ async function loadRecipesStaged() {
     const all = await fetchAllRecipes(currentUser.uid);
     if (token !== recipesFetchToken) return;
 
-    allRecipes = all;
-    refreshHomeRecipes();
-    libraryLoading = false;
-
-    if (view.pinFlow?.step === 'list') {
-      syncPinListCount();
-      pinVirtualList?.update();
-    }
+    applyLibraryRecipes(all);
     render();
   } catch (err) {
     libraryLoading = false;
@@ -175,22 +186,18 @@ function recipesSnapshotChanged(prevRecipes, nextRecipes, prevOrder, nextOrder) 
 }
 
 async function refreshRecipesInBackground() {
-  if (!currentUser) return;
-  const token = ++recipesFetchToken;
+  if (!currentUser || libraryLoading) return;
+  const token = recipesFetchToken;
   try {
     const [all, order] = await Promise.all([
       fetchAllRecipes(currentUser.uid),
       fetchHomeOrder(currentUser.uid),
     ]);
-    if (token !== recipesFetchToken) return;
+    if (token !== recipesFetchToken || !currentUser) return;
     if (!recipesSnapshotChanged(allRecipes, all, homeOrder, order)) return;
-    allRecipes = all;
-    homeOrder = order;
-    libraryLoading = false;
-    refreshHomeRecipes();
+    applyLibraryRecipes(all, order);
     if (view.pinFlow?.step === 'list') {
-      syncPinListCount();
-      pinVirtualList?.update();
+      render();
       return;
     }
     if (view.name === 'home') render();
@@ -542,7 +549,7 @@ function renderPinFlow() {
 
     return `
       <div class="panel-backdrop" id="pin-backdrop">
-        <div class="pin-panel" role="dialog">
+        <div class="pin-panel pin-panel-list" role="dialog">
           <header class="pin-header">
             <h2>Coffees</h2>
             <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
@@ -1532,7 +1539,7 @@ function bindShell() {
     view.pinFlow = { step: 'list', filter: 'all', search: '' };
     view.reorderMode = false;
     render();
-    refreshRecipesInBackground();
+    if (!libraryLoading) refreshRecipesInBackground();
   });
   document.getElementById('btn-reorder')?.addEventListener('click', async () => {
     if (view.reorderMode) {

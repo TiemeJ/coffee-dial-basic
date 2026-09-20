@@ -12,7 +12,6 @@ import {
   deleteDoc,
   deleteField,
   query,
-  orderBy,
   where,
   documentId,
 } from 'firebase/firestore';
@@ -45,16 +44,30 @@ function recipeRef(uid, recipeId) {
   return doc(db, 'users', uid, 'simpleRecipes', recipeId);
 }
 
+function recipeCreatedAtMs(recipe) {
+  const value = recipe?.createdAt;
+  if (!value) return 0;
+  if (typeof value === 'string') {
+    const time = Date.parse(value);
+    return Number.isNaN(time) ? 0 : time;
+  }
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortRecipesByCreatedAt(recipes) {
+  return [...recipes].sort((a, b) => recipeCreatedAtMs(b) - recipeCreatedAtMs(a));
+}
+
 export async function fetchOpenRecipes(uid) {
-  const snap = await getDocs(query(recipesRef(uid), orderBy('createdAt', 'desc')));
-  return snap.docs
-    .map((d) => normalizeRecipe({ id: d.id, ...d.data() }))
-    .filter((r) => r.isOpen !== false);
+  const recipes = await fetchAllRecipes(uid);
+  return recipes.filter((r) => r.isOpen !== false);
 }
 
 export async function fetchAllRecipes(uid) {
-  const snap = await getDocs(query(recipesRef(uid), orderBy('createdAt', 'desc')));
-  return snap.docs.map((d) => normalizeRecipe({ id: d.id, ...d.data() }));
+  const snap = await getDocs(recipesRef(uid));
+  return sortRecipesByCreatedAt(snap.docs.map((d) => normalizeRecipe({ id: d.id, ...d.data() })));
 }
 
 export async function fetchRecipesByIds(uid, ids) {
