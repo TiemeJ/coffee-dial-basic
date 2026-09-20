@@ -24,27 +24,54 @@ function normalizeField(value) {
   return text || 'Unknown';
 }
 
+function caseKey(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function formatStatLabel(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function splitListField(value) {
   const text = String(value ?? '').trim();
   if (!text) return [];
   const parts = text
-    .split(',')
+    .split(/[,&]/)
     .map((part) => part.trim())
     .filter(Boolean);
-  return [...new Set(parts)];
+  const seen = new Set();
+  const unique = [];
+  for (const part of parts) {
+    const key = caseKey(part);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(part);
+  }
+  return unique;
+}
+
+function incrementCountEntry(counts, label) {
+  const key = caseKey(label);
+  const current = counts.get(key);
+  if (current) {
+    current.value += 1;
+    return;
+  }
+  counts.set(key, { label: formatStatLabel(label), value: 1 });
 }
 
 function sortedCountEntries(counts) {
-  return [...counts.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+  return [...counts.values()].sort(
+    (a, b) => b.value - a.value || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+  );
 }
 
 function countByField(recipes, getter) {
   const counts = new Map();
   for (const recipe of recipes) {
-    const key = normalizeField(getter(recipe));
-    counts.set(key, (counts.get(key) || 0) + 1);
+    incrementCountEntry(counts, normalizeField(getter(recipe)));
   }
   return sortedCountEntries(counts);
 }
@@ -52,8 +79,8 @@ function countByField(recipes, getter) {
 function countBySplitField(recipes, getter) {
   const counts = new Map();
   for (const recipe of recipes) {
-    for (const key of splitListField(getter(recipe))) {
-      counts.set(key, (counts.get(key) || 0) + 1);
+    for (const label of splitListField(getter(recipe))) {
+      incrementCountEntry(counts, label);
     }
   }
   return sortedCountEntries(counts);
@@ -160,10 +187,10 @@ export function computeLibraryStats(recipes) {
     ratedDrinks: drinkCounts.rated,
     fiveStarDrinks: collectFiveStarDrinks(list),
     charts: {
-      roaster: buildChartData(countByField(list, (recipe) => recipe.roaster)),
+      roaster: buildChartData(countBySplitField(list, (recipe) => recipe.roaster)),
       variety: buildChartData(countBySplitField(list, (recipe) => recipe.variety)),
-      processing: buildChartData(countByField(list, (recipe) => recipe.processing)),
-      roastType: buildChartData(countByField(list, (recipe) => recipe.roastType)),
+      processing: buildChartData(countBySplitField(list, (recipe) => recipe.processing)),
+      roastType: buildChartData(countBySplitField(list, (recipe) => recipe.roastType)),
     },
     origins,
   };
