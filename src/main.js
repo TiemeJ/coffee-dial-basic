@@ -592,7 +592,11 @@ function statsOtherKey(chartId) {
   return `${chartId}-other`;
 }
 
-function renderStatsLegendItem(chartId, slice, statsExpanded) {
+function formatStatsOtherShare(entry, mentionTotal) {
+  return mentionTotal ? `${Math.round((entry.value / mentionTotal) * 100)}%` : '0%';
+}
+
+function renderStatsLegendItem(chartId, slice, statsExpanded, mentionTotal) {
   if (slice.label === 'Other' && slice.otherEntries?.length) {
     const isOtherExpanded = Boolean(statsExpanded[statsOtherKey(chartId)]);
     const subList = slice.otherEntries
@@ -600,7 +604,7 @@ function renderStatsLegendItem(chartId, slice, statsExpanded) {
         (entry) => `
         <li class="stats-other-item">
           <span class="stats-other-label">${escapeHtml(entry.label)}</span>
-          <span class="stats-other-value">${entry.value}</span>
+          <span class="stats-other-value">${formatStatsOtherShare(entry, mentionTotal)}</span>
         </li>`
       )
       .join('');
@@ -615,7 +619,7 @@ function renderStatsLegendItem(chartId, slice, statsExpanded) {
         >
           <span class="stats-swatch" style="background:${slice.color}"></span>
           <span class="stats-legend-label">${escapeHtml(slice.label)}</span>
-          <span class="stats-legend-value">${slice.value} · ${slice.percent}%</span>
+          <span class="stats-legend-value">${slice.percent}%</span>
           <span class="stats-legend-other-chevron" aria-hidden="true">›</span>
         </button>
         <ul class="stats-other-list"${isOtherExpanded ? '' : ' hidden'}>${subList}</ul>
@@ -626,7 +630,7 @@ function renderStatsLegendItem(chartId, slice, statsExpanded) {
     <li class="stats-legend-item">
       <span class="stats-swatch" style="background:${slice.color}"></span>
       <span class="stats-legend-label">${escapeHtml(slice.label)}</span>
-      <span class="stats-legend-value">${slice.value} · ${slice.percent}%</span>
+      <span class="stats-legend-value">${slice.percent}%</span>
     </li>`;
 }
 
@@ -636,7 +640,7 @@ function renderStatsChartBody(chartId, chartData, statsExpanded = {}) {
   }
 
   const legend = chartData.slices
-    .map((slice) => renderStatsLegendItem(chartId, slice, statsExpanded))
+    .map((slice) => renderStatsLegendItem(chartId, slice, statsExpanded, chartData.mentionTotal))
     .join('');
 
   return `
@@ -688,9 +692,10 @@ function renderFiveStarDrinksBody(drinks) {
       data-stats-method="${escapeHtml(row.methodName)}"
       data-stats-drink="${escapeHtml(row.drinkName)}"
     >
-      <span class="stats-star-blend">${escapeHtml(row.blend)}</span>
-      <span class="stats-star-roaster">${escapeHtml(row.roaster)}</span>
-      <span class="stats-star-drink">${escapeHtml(row.drink)}</span>
+      <span class="stats-star-title">
+        <span class="stats-star-blend">${escapeHtml(row.blend)}</span>
+        <span class="stats-star-meta"> · ${escapeHtml(row.roaster)} · ${escapeHtml(row.drink)}</span>
+      </span>
     </button>`
     )
     .join('');
@@ -1213,7 +1218,7 @@ function bindPinFlow() {
       });
     });
 
-    document.querySelectorAll('[data-stats-view-drink]').forEach((btn) => {
+    document.querySelectorAll('.stats-star-row').forEach((btn) => {
       btn.addEventListener('click', () => {
         view.pinFlow = pinFlowPreserveState({
           step: 'view',

@@ -96,9 +96,28 @@ function groupSmallSlices(slices, maxSlices = MAX_CHART_SLICES) {
   return [...head, { label: 'Other', value: otherValue, otherEntries: tail }];
 }
 
+function roundedMentionPercents(values) {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (!total) return values.map(() => 0);
+
+  const raw = values.map((value) => (value / total) * 100);
+  const floors = raw.map((percent) => Math.floor(percent));
+  let remaining = 100 - floors.reduce((sum, percent) => sum + percent, 0);
+  const ranked = raw
+    .map((percent, index) => ({ index, remainder: percent - floors[index] }))
+    .sort((a, b) => b.remainder - a.remainder);
+
+  const percents = [...floors];
+  for (let i = 0; i < remaining; i += 1) {
+    percents[ranked[i].index] += 1;
+  }
+  return percents;
+}
+
 export function buildChartSlices(entries) {
   const grouped = groupSmallSlices(entries);
   const total = grouped.reduce((sum, slice) => sum + slice.value, 0) || 1;
+  const percents = roundedMentionPercents(grouped.map((slice) => slice.value));
   let cursor = 0;
   return grouped.map((slice, index) => {
     const start = (cursor / total) * 100;
@@ -109,7 +128,7 @@ export function buildChartSlices(entries) {
       color: CHART_COLORS[index % CHART_COLORS.length],
       start,
       end,
-      percent: Math.round((slice.value / total) * 100),
+      percent: percents[index],
     };
     if (slice.label === 'Other' && slice.otherEntries) {
       result.otherEntries = slice.otherEntries;
@@ -168,9 +187,11 @@ export function collectFiveStarDrinks(recipes) {
 
 function buildChartData(entries) {
   const items = entries.filter((entry) => entry.label !== 'Unknown');
+  const slices = buildChartSlices(items);
   return {
     uniqueCount: items.length,
-    slices: buildChartSlices(items),
+    mentionTotal: slices.reduce((sum, slice) => sum + slice.value, 0),
+    slices,
     entries: items,
   };
 }

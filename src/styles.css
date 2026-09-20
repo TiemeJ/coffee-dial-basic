@@ -649,16 +649,14 @@ input {
 .stats-star-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .stats-star-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.9fr);
-  gap: 0.45rem;
+  display: block;
   width: 100%;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
@@ -673,22 +671,23 @@ input {
   border-color: rgba(176, 137, 104, 0.35);
 }
 
-.stats-star-blend {
-  font-weight: 600;
+.stats-star-title {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
-.stats-star-roaster,
-.stats-star-drink {
-  font-size: 0.74rem;
-  color: rgba(255, 255, 255, 0.72);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.stats-star-blend {
+  font-weight: 600;
+}
+
+.stats-star-meta {
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 400;
 }
 
 .stats-origin-list {
@@ -2612,11 +2611,6 @@ input {
   .pin-panel-stats {
     height: 92vh;
     height: 92dvh;
-  }
-
-  .stats-star-row {
-    grid-template-columns: 1fr;
-    gap: 0.15rem;
   }
 
   .recipe-panel-view {
