@@ -87,6 +87,7 @@ import {
   toggleAttrFilter,
 } from './pinFilters.js';
 import { computeLibraryStats, donutGradient } from './stats.js';
+import { renderOriginMapPlaceholder, scheduleOriginMapMount } from './originMap.js';
 
 const TILE_BG_COUNT = 6;
 
@@ -716,7 +717,9 @@ function renderOriginsBody(origins) {
     )
     .join('');
 
-  return `<ul class="stats-origin-list">${rows}</ul>`;
+  return `
+    ${renderOriginMapPlaceholder()}
+    <ul class="stats-origin-list">${rows}</ul>`;
 }
 
 function renderPinStatsContent(data, statsExpanded = {}) {
@@ -1190,6 +1193,9 @@ function bindPinFlow() {
 
   if (view.pinFlow?.step === 'stats') {
     if (view.pinFlow.statsLoading) schedulePinStatsCompute();
+    if (view.pinFlow.statsExpanded?.origins) {
+      scheduleOriginMapMount(view.pinFlow.statsCache?.origins || []);
+    }
 
     document.getElementById('pin-stats-back')?.addEventListener('click', () => {
       view.pinFlow = pinFlowListState();

@@ -690,6 +690,41 @@ input {
   font-weight: 400;
 }
 
+.stats-origin-map {
+  margin-bottom: 0.75rem;
+}
+
+.stats-origin-map-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.stats-origin-map-svg path {
+  vector-effect: non-scaling-stroke;
+}
+
+.stats-origin-map-loading,
+.stats-origin-map-empty,
+.stats-origin-unmapped {
+  margin: 0 0 0.75rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.stats-origin-map-loading {
+  padding: 2.5rem 0.75rem;
+  text-align: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.stats-origin-unmapped {
+  margin: 0.45rem 0 0;
+}
+
 .stats-origin-list {
   list-style: none;
   margin: 0;
