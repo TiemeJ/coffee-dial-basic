@@ -86,6 +86,7 @@ import {
   removeAttrFilter,
   toggleAttrFilter,
 } from './pinFilters.js';
+import { computeLibraryStats, donutGradient } from './stats.js';
 
 const TILE_BG_COUNT = 6;
 
@@ -108,8 +109,21 @@ function pinFlowListState(overrides = {}) {
     attrFilters: base.attrFilters,
     filterMenuOpen: base.filterMenuOpen,
     filterMenuDimension: base.filterMenuDimension,
+    statsLoading: false,
+    statsCache: null,
+    statsExpanded: {},
+    returnStep: null,
     ...overrides,
   };
+}
+
+function schedulePinStatsCompute() {
+  requestAnimationFrame(() => {
+    if (view.pinFlow?.step !== 'stats' || !view.pinFlow.statsLoading) return;
+    view.pinFlow.statsCache = computeLibraryStats(allRecipes);
+    view.pinFlow.statsLoading = false;
+    render();
+  });
 }
 
 function pinFlowPreserveState(overrides = {}) {
@@ -553,6 +567,211 @@ function renderPinFilterChips(activeFilter) {
     .join('');
 }
 
+function renderPinStatsIcon() {
+  return `<svg class="pin-stats-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M5 19V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    <path d="M10 19V5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    <path d="M15 19V13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    <path d="M20 19V8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+  </svg>`;
+}
+
+function renderPinFiltersRow(activeFilter) {
+  return `
+    <div class="pin-filters-row">
+      <div class="pin-filters" role="group" aria-label="Filter coffees">
+        ${renderPinFilterChips(activeFilter)}
+      </div>
+      <button type="button" class="pin-stats-btn" id="pin-open-stats" title="Statistics" aria-label="Statistics">
+        ${renderPinStatsIcon()}
+      </button>
+    </div>`;
+}
+
+function statsOtherKey(chartId) {
+  return `${chartId}-other`;
+}
+
+function renderStatsLegendItem(chartId, slice, statsExpanded) {
+  if (slice.label === 'Other' && slice.otherEntries?.length) {
+    const isOtherExpanded = Boolean(statsExpanded[statsOtherKey(chartId)]);
+    const subList = slice.otherEntries
+      .map(
+        (entry) => `
+        <li class="stats-other-item">
+          <span class="stats-other-label">${escapeHtml(entry.label)}</span>
+          <span class="stats-other-value">${entry.value}</span>
+        </li>`
+      )
+      .join('');
+
+    return `
+      <li class="stats-legend-item stats-legend-other${isOtherExpanded ? ' is-expanded' : ''}">
+        <button
+          type="button"
+          class="stats-legend-other-toggle"
+          data-stats-other="${escapeHtml(chartId)}"
+          aria-expanded="${isOtherExpanded}"
+        >
+          <span class="stats-swatch" style="background:${slice.color}"></span>
+          <span class="stats-legend-label">${escapeHtml(slice.label)}</span>
+          <span class="stats-legend-value">${slice.value} · ${slice.percent}%</span>
+          <span class="stats-legend-other-chevron" aria-hidden="true">›</span>
+        </button>
+        <ul class="stats-other-list"${isOtherExpanded ? '' : ' hidden'}>${subList}</ul>
+      </li>`;
+  }
+
+  return `
+    <li class="stats-legend-item">
+      <span class="stats-swatch" style="background:${slice.color}"></span>
+      <span class="stats-legend-label">${escapeHtml(slice.label)}</span>
+      <span class="stats-legend-value">${slice.value} · ${slice.percent}%</span>
+    </li>`;
+}
+
+function renderStatsChartBody(chartId, chartData, statsExpanded = {}) {
+  if (!chartData.uniqueCount) {
+    return '<p class="stats-empty">No data yet.</p>';
+  }
+
+  const legend = chartData.slices
+    .map((slice) => renderStatsLegendItem(chartId, slice, statsExpanded))
+    .join('');
+
+  return `
+    <div class="stats-chart-body">
+      <div class="stats-donut" style="background:${donutGradient(chartData.slices)}">
+        <div class="stats-donut-hole" aria-hidden="true"></div>
+      </div>
+      <ul class="stats-legend">${legend}</ul>
+    </div>`;
+}
+
+function renderStatsCollapsible(sectionId, title, countLabel, bodyHtml, isExpanded) {
+  return `
+    <section class="stats-chart-collapsible${isExpanded ? ' is-expanded' : ''}">
+      <button
+        type="button"
+        class="stats-chart-toggle"
+        data-stats-chart="${escapeHtml(sectionId)}"
+        aria-expanded="${isExpanded}"
+      >
+        <span class="stats-chart-toggle-title">${escapeHtml(title)}</span>
+        <span class="stats-chart-toggle-count">${escapeHtml(countLabel)}</span>
+        <span class="stats-chart-chevron" aria-hidden="true">›</span>
+      </button>
+      <div class="stats-chart-panel"${isExpanded ? '' : ' hidden'}>${bodyHtml}</div>
+    </section>`;
+}
+
+function renderStatsChartCollapsible(chartId, title, chartData, isExpanded, statsExpanded = {}) {
+  return renderStatsCollapsible(
+    chartId,
+    title,
+    `${chartData.uniqueCount} unique`,
+    renderStatsChartBody(chartId, chartData, statsExpanded),
+    isExpanded
+  );
+}
+
+function renderFiveStarDrinksBody(drinks) {
+  if (!drinks.length) return '<p class="stats-empty">No five-star drinks yet.</p>';
+
+  const rows = drinks
+    .map(
+      (row) => `
+    <button
+      type="button"
+      class="stats-star-row"
+      data-stats-recipe="${escapeHtml(row.recipeId)}"
+      data-stats-method="${escapeHtml(row.methodName)}"
+      data-stats-drink="${escapeHtml(row.drinkName)}"
+    >
+      <span class="stats-star-blend">${escapeHtml(row.blend)}</span>
+      <span class="stats-star-roaster">${escapeHtml(row.roaster)}</span>
+      <span class="stats-star-drink">${escapeHtml(row.drink)}</span>
+    </button>`
+    )
+    .join('');
+
+  return `<div class="stats-star-list">${rows}</div>`;
+}
+
+function renderOriginsBody(origins) {
+  if (!origins.length) return '<p class="stats-empty">No origins recorded yet.</p>';
+
+  const rows = origins
+    .map(
+      (row) => `
+    <li class="stats-origin-row">
+      <span>${escapeHtml(row.label)}</span>
+      <span>${row.value}</span>
+    </li>`
+    )
+    .join('');
+
+  return `<ul class="stats-origin-list">${rows}</ul>`;
+}
+
+function renderPinStatsContent(data, statsExpanded = {}) {
+  const fiveStarCount = data.fiveStarDrinks.length;
+  const originCount = data.origins.length;
+
+  return `
+    <div class="stats-summary">
+      <p><strong>${data.totalCoffees}</strong> coffee${data.totalCoffees === 1 ? '' : 's'}</p>
+      <p><strong>${data.onHomeCount}</strong> on home</p>
+      <p><strong>${data.totalDrinks}</strong> drink recipe${data.totalDrinks === 1 ? '' : 's'}</p>
+      <p><strong>${fiveStarCount}</strong> five-star drink${fiveStarCount === 1 ? '' : 's'}</p>
+    </div>
+    ${renderStatsChartCollapsible('roaster', 'Roaster', data.charts.roaster, Boolean(statsExpanded.roaster), statsExpanded)}
+    ${renderStatsChartCollapsible('variety', 'Variety', data.charts.variety, Boolean(statsExpanded.variety), statsExpanded)}
+    ${renderStatsChartCollapsible('processing', 'Processing', data.charts.processing, Boolean(statsExpanded.processing), statsExpanded)}
+    ${renderStatsChartCollapsible('roastType', 'Roast type', data.charts.roastType, Boolean(statsExpanded.roastType), statsExpanded)}
+    ${renderStatsCollapsible(
+      'fiveStar',
+      'Five-star drinks',
+      `${fiveStarCount} drink${fiveStarCount === 1 ? '' : 's'}`,
+      renderFiveStarDrinksBody(data.fiveStarDrinks),
+      Boolean(statsExpanded.fiveStar)
+    )}
+    ${renderStatsCollapsible(
+      'origins',
+      'Origins',
+      `${originCount} unique`,
+      renderOriginsBody(data.origins),
+      Boolean(statsExpanded.origins)
+    )}`;
+}
+
+function renderPinStatsFlow() {
+  const loading = view.pinFlow.statsLoading || libraryLoading;
+  const body = loading
+    ? '<p class="pin-empty stats-loading">Calculating statistics…</p>'
+    : renderPinStatsContent(
+        view.pinFlow.statsCache || computeLibraryStats(allRecipes),
+        view.pinFlow.statsExpanded || {}
+      );
+
+  return `
+    <div class="panel-backdrop" id="pin-backdrop">
+      <div class="pin-panel pin-panel-stats" role="dialog">
+        <header class="pin-header">
+          <div>
+            <h2>Statistics</h2>
+            <p class="pin-subtitle">Full library overview</p>
+          </div>
+          <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
+        </header>
+        <div class="stats-body">${body}</div>
+        <footer class="stats-footer">
+          <button type="button" class="edit-footer-discard" id="pin-stats-back">Back to list</button>
+        </footer>
+      </div>
+    </div>`;
+}
+
 function renderPinSectionRow(title, isFirst) {
   return `<h3 class="pin-list-section-title pin-list-virtual-section${isFirst ? ' is-first' : ''}">${escapeHtml(title)}</h3>`;
 }
@@ -706,6 +925,10 @@ function syncPinListCount() {
 }
 
 function renderPinFlow() {
+  if (view.pinFlow.step === 'stats') {
+    return renderPinStatsFlow();
+  }
+
   if (view.pinFlow.step === 'list') {
     if (allRecipes.length === 0 && !libraryLoading) {
       return `
@@ -734,9 +957,7 @@ function renderPinFlow() {
           <div class="pin-toolbar">
             ${renderPinSearchBar(state.search, state, filterOptions)}
             <div id="pin-active-filters-host">${renderPinActiveFilterChips(state.attrFilters)}</div>
-            <div class="pin-filters" role="group" aria-label="Filter coffees">
-              ${renderPinFilterChips(state.filter)}
-            </div>
+            ${renderPinFiltersRow(state.filter)}
             <p class="pin-list-count" id="pin-list-count" data-total="${stats.total}" data-on-home="${stats.onHomeTotal}">
               ${escapeHtml(pinListCountText(stats, state.filter, state.search))}
             </p>
@@ -962,6 +1183,52 @@ function bindPinFlow() {
     render();
   });
 
+  if (view.pinFlow?.step === 'stats') {
+    if (view.pinFlow.statsLoading) schedulePinStatsCompute();
+
+    document.getElementById('pin-stats-back')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowListState();
+      render();
+    });
+
+    document.querySelectorAll('[data-stats-chart]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const chartId = btn.dataset.statsChart;
+        const expanded = { ...(view.pinFlow.statsExpanded || {}) };
+        expanded[chartId] = !expanded[chartId];
+        view.pinFlow.statsExpanded = expanded;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-stats-other]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const chartId = btn.dataset.statsOther;
+        const key = statsOtherKey(chartId);
+        const expanded = { ...(view.pinFlow.statsExpanded || {}) };
+        expanded[key] = !expanded[key];
+        view.pinFlow.statsExpanded = expanded;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-stats-view-drink]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        view.pinFlow = pinFlowPreserveState({
+          step: 'view',
+          recipeId: btn.dataset.statsRecipe,
+          methodName: btn.dataset.statsMethod,
+          drinkName: btn.dataset.statsDrink,
+          returnStep: 'stats',
+        });
+        render();
+      });
+    });
+
+    return;
+  }
+
   if (view.pinFlow?.step === 'list') {
     const pinSearchInput = document.getElementById('pin-coffee-search');
     const pinListBody = document.getElementById('pin-list-body');
@@ -1060,6 +1327,16 @@ function bindPinFlow() {
         });
         refreshPinListView({ resetScroll: true });
       });
+    });
+
+    document.getElementById('pin-open-stats')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowListState({
+        step: 'stats',
+        statsLoading: true,
+        statsCache: null,
+        statsExpanded: {},
+      });
+      render();
     });
 
     pinListBody?.addEventListener('click', async (e) => {
@@ -1170,10 +1447,20 @@ function bindPinFlow() {
   });
 
   document.getElementById('pin-view-back')?.addEventListener('click', () => {
-    view.pinFlow = pinFlowPreserveState({
-      step: 'configure',
-      recipeId: view.pinFlow.recipeId,
-    });
+    const returnStep = view.pinFlow.returnStep || 'configure';
+    if (returnStep === 'stats') {
+      view.pinFlow = pinFlowListState({
+        step: 'stats',
+        statsCache: view.pinFlow.statsCache,
+        statsLoading: false,
+        statsExpanded: view.pinFlow.statsExpanded || {},
+      });
+    } else {
+      view.pinFlow = pinFlowPreserveState({
+        step: 'configure',
+        recipeId: view.pinFlow.recipeId,
+      });
+    }
     render();
   });
 
