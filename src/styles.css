@@ -557,38 +557,200 @@ input {
   padding: 1rem;
 }
 
-.pin-search {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.pin-search-combo-wrap {
+  position: relative;
   margin-bottom: 0.5rem;
 }
 
-.pin-search-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.pin-search-input {
-  padding: 0.45rem 0.55rem;
-  border-radius: 8px;
+.pin-search-combo {
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background-color: var(--bg-input);
-  color: var(--text);
-  font-size: 0.85rem;
-  width: 100%;
+  overflow: hidden;
 }
 
-.pin-search-input:focus {
+.pin-search-combo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.pin-search-combo-input:focus {
   outline: none;
+}
+
+.pin-search-combo:focus-within {
   border-color: var(--accent);
 }
 
-.pin-search-input::placeholder {
+.pin-search-combo-input::placeholder {
   color: rgba(245, 239, 232, 0.35);
+}
+
+.pin-search-filter-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+}
+
+.pin-search-filter-btn:hover,
+.pin-search-filter-btn.is-active {
+  color: var(--accent);
+  background: rgba(176, 137, 104, 0.08);
+}
+
+.pin-search-filter-icon {
+  display: block;
+}
+
+.pin-attr-filter-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: #2a241f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 16rem;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.pin-attr-filter-menu.is-hidden {
+  display: none;
+}
+
+.pin-attr-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.68rem 0.85rem;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.pin-attr-filter-row:last-child {
+  border-bottom: none;
+}
+
+.pin-attr-filter-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pin-attr-filter-row.is-checked {
+  font-weight: 600;
+}
+
+.pin-attr-filter-row:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pin-attr-filter-back {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.82rem;
+}
+
+.pin-attr-filter-chevron,
+.pin-attr-filter-mark {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.pin-attr-filter-mark {
+  color: var(--accent);
+}
+
+.pin-attr-filter-empty {
+  padding: 0.85rem;
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pin-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.pin-active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.35rem 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.pin-active-filter-label {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pin-active-filter-value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pin-active-filter-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pin-active-filter-remove:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.pin-clear-filters {
+  padding: 0.15rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.pin-clear-filters:hover {
+  color: var(--text);
 }
 
 .pin-list-item[hidden] {

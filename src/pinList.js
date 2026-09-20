@@ -1,24 +1,27 @@
 import { displayName, isOnHomeScreen, recipeSearchText } from './utils.js';
+import { normalizeAttrFilters, recipeMatchesAttrFilters } from './pinFilters.js';
 
 const ITEM_HEIGHT = 52;
 const SECTION_HEIGHT = 32;
 const SECTION_GAP = 14;
 const BUFFER_ROWS = 6;
 
-export function pinRecipeMatches(recipe, filter, query) {
+export function pinRecipeMatches(recipe, filter, query, attrFilters = []) {
   const onHome = isOnHomeScreen(recipe);
   if (filter === 'on-home' && !onHome) return false;
   if (filter === 'not-on-home' && onHome) return false;
   const q = String(query ?? '').trim().toLowerCase();
   if (q && !recipeSearchText(recipe).includes(q)) return false;
+  if (!recipeMatchesAttrFilters(recipe, attrFilters)) return false;
   return true;
 }
 
-export function buildPinListRows(recipes, filter, query) {
+export function buildPinListRows(recipes, filter, query, attrFilters = []) {
+  const activeAttrFilters = normalizeAttrFilters(attrFilters);
   const sorted = [...recipes].sort((a, b) =>
     displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base' })
   );
-  const filtered = sorted.filter((recipe) => pinRecipeMatches(recipe, filter, query));
+  const filtered = sorted.filter((recipe) => pinRecipeMatches(recipe, filter, query, activeAttrFilters));
   const onHome = filtered.filter(isOnHomeScreen);
   const library = filtered.filter((recipe) => !isOnHomeScreen(recipe));
   const rows = [];
@@ -64,7 +67,10 @@ function findRowAtOffset(starts, offset) {
   return lo;
 }
 
-export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, renderItem, renderSection }) {
+export function createPinVirtualList(
+  bodyEl,
+  { getRecipes, getFilter, getQuery, getAttrFilters, renderItem, renderSection }
+) {
   if (!bodyEl) {
     return {
       update() {},
@@ -83,7 +89,12 @@ export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, 
   const paint = () => {
     rafId = 0;
 
-    const { rows: nextRows, visible } = buildPinListRows(getRecipes(), getFilter(), getQuery());
+    const { rows: nextRows, visible } = buildPinListRows(
+      getRecipes(),
+      getFilter(),
+      getQuery(),
+      getAttrFilters?.()
+    );
     rows = nextRows;
     layout = buildLayout(rows);
     const totalHeight = layout[layout.length - 1] || 0;
@@ -149,8 +160,11 @@ export function createPinVirtualList(bodyEl, { getRecipes, getFilter, getQuery, 
   };
 }
 
-export function formatPinListCount({ visible, total, onHomeTotal, filter, query }) {
-  const isFiltered = Boolean(String(query ?? '').trim()) || filter !== 'all';
+export function formatPinListCount({ visible, total, onHomeTotal, filter, query, attrFilters = [] }) {
+  const isFiltered =
+    Boolean(String(query ?? '').trim()) ||
+    filter !== 'all' ||
+    normalizeAttrFilters(attrFilters).length > 0;
   if (isFiltered) {
     return `${visible} matching · ${onHomeTotal} on home · ${total} total`;
   }

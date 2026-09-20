@@ -77,8 +77,62 @@ import {
   createPinVirtualList,
   formatPinListCount,
 } from './pinList.js';
+import {
+  PIN_FILTER_DIMENSIONS,
+  buildPinFilterOptions,
+  dimensionLabel,
+  filterKey,
+  normalizeAttrFilters,
+  removeAttrFilter,
+  toggleAttrFilter,
+} from './pinFilters.js';
 
 const TILE_BG_COUNT = 6;
+
+function pinListState() {
+  return {
+    filter: view.pinFlow?.filter || 'all',
+    search: view.pinFlow?.search || '',
+    attrFilters: normalizeAttrFilters(view.pinFlow?.attrFilters),
+    filterMenuOpen: Boolean(view.pinFlow?.filterMenuOpen),
+    filterMenuDimension: view.pinFlow?.filterMenuDimension || null,
+  };
+}
+
+function pinFlowListState(overrides = {}) {
+  const base = pinListState();
+  return {
+    step: 'list',
+    filter: base.filter,
+    search: base.search,
+    attrFilters: base.attrFilters,
+    filterMenuOpen: base.filterMenuOpen,
+    filterMenuDimension: base.filterMenuDimension,
+    ...overrides,
+  };
+}
+
+function pinFlowPreserveState(overrides = {}) {
+  const base = pinListState();
+  return {
+    filter: base.filter,
+    search: base.search,
+    attrFilters: base.attrFilters,
+    filterMenuOpen: false,
+    filterMenuDimension: null,
+    ...overrides,
+  };
+}
+
+function refreshPinListView({ resetScroll = false } = {}) {
+  syncPinListCount();
+  syncPinActiveFilters();
+  syncPinAttrFilterMenu();
+  const filterBtn = document.getElementById('pin-filter-toggle');
+  const hasAttrFilters = normalizeAttrFilters(view.pinFlow?.attrFilters).length > 0;
+  filterBtn?.classList.toggle('is-active', Boolean(view.pinFlow?.filterMenuOpen) || hasAttrFilters);
+  pinVirtualList?.update({ resetScroll });
+}
 
 const app = document.getElementById('app');
 
@@ -503,6 +557,136 @@ function renderPinSectionRow(title, isFirst) {
   return `<h3 class="pin-list-section-title pin-list-virtual-section${isFirst ? ' is-first' : ''}">${escapeHtml(title)}</h3>`;
 }
 
+function renderPinSearchFilterIcon() {
+  return `<svg class="pin-search-filter-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 5h16l-6 7v6l-4 2v-8L4 5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+  </svg>`;
+}
+
+function renderPinSearchBar(searchValue, state, options) {
+  const { filterMenuOpen, attrFilters } = state;
+  const hasActiveFilters = attrFilters.length > 0;
+  return `
+    <div class="pin-search-combo-wrap">
+      <div class="pin-search-combo">
+        <input
+          type="search"
+          id="pin-coffee-search"
+          class="pin-search-combo-input"
+          placeholder="Search brews…"
+          autocomplete="off"
+          value="${escapeHtml(searchValue)}"
+        />
+        <button
+          type="button"
+          class="pin-search-filter-btn${filterMenuOpen || hasActiveFilters ? ' is-active' : ''}"
+          id="pin-filter-toggle"
+          aria-expanded="${filterMenuOpen}"
+          aria-controls="pin-attr-filter-menu"
+          title="Filter"
+          aria-label="Filter coffees"
+        >
+          ${renderPinSearchFilterIcon()}
+        </button>
+      </div>
+      <div class="pin-attr-filter-menu${filterMenuOpen ? '' : ' is-hidden'}" id="pin-attr-filter-menu"${filterMenuOpen ? '' : ' hidden'}>
+        ${renderPinAttrFilterMenuContent(options, state)}
+      </div>
+    </div>`;
+}
+
+function renderPinAttrFilterMenuContent(options, { filterMenuDimension, attrFilters }) {
+  const active = normalizeAttrFilters(attrFilters);
+  const selectedByDimension = new Map();
+  for (const { dimension, value } of active) {
+    if (!selectedByDimension.has(dimension)) selectedByDimension.set(dimension, new Set());
+    selectedByDimension.get(dimension).add(value);
+  }
+
+  if (filterMenuDimension) {
+    const values = options[filterMenuDimension] || [];
+    const selected = selectedByDimension.get(filterMenuDimension) || new Set();
+    const rows = values.length
+      ? values
+          .map((value) => {
+            const checked = selected.has(value);
+            return `
+          <button
+            type="button"
+            class="pin-attr-filter-row${checked ? ' is-checked' : ''}"
+            data-filter-value="${escapeHtml(filterMenuDimension)}"
+            data-filter-option="${escapeHtml(value)}"
+          >
+            <span>${escapeHtml(value)}</span>
+            ${checked ? '<span class="pin-attr-filter-mark" aria-hidden="true">✓</span>' : ''}
+          </button>`;
+          })
+          .join('')
+      : `<p class="pin-attr-filter-empty">No values yet for ${escapeHtml(dimensionLabel(filterMenuDimension))}.</p>`;
+
+    return `
+      <button type="button" class="pin-attr-filter-row pin-attr-filter-back" data-filter-back>
+        <span class="pin-attr-filter-back-label">← ${escapeHtml(dimensionLabel(filterMenuDimension))}</span>
+      </button>
+      ${rows}`;
+  }
+
+  return PIN_FILTER_DIMENSIONS.map(({ id, label }) => {
+    const count = selectedByDimension.get(id)?.size || 0;
+    const hasValues = (options[id] || []).length > 0;
+    return `
+      <button
+        type="button"
+        class="pin-attr-filter-row${count ? ' is-checked' : ''}"
+        data-filter-dimension="${escapeHtml(id)}"
+        ${hasValues ? '' : 'disabled'}
+      >
+        <span>${escapeHtml(label)}</span>
+        ${count ? '<span class="pin-attr-filter-mark" aria-hidden="true">✓</span>' : '<span class="pin-attr-filter-chevron" aria-hidden="true">›</span>'}
+      </button>`;
+  }).join('');
+}
+
+function renderPinActiveFilterChips(attrFilters) {
+  const active = normalizeAttrFilters(attrFilters);
+  if (!active.length) return '';
+
+  const chips = active
+    .map(({ dimension, value }) => {
+      const key = filterKey(dimension, value);
+      return `
+      <span class="pin-active-filter-chip">
+        <span class="pin-active-filter-label">${escapeHtml(dimensionLabel(dimension))}:</span>
+        <span class="pin-active-filter-value">${escapeHtml(value)}</span>
+        <button type="button" class="pin-active-filter-remove" data-remove-attr-filter="${escapeHtml(key)}" aria-label="Remove ${escapeHtml(dimensionLabel(dimension))} filter ${escapeHtml(value)}">×</button>
+      </span>`;
+    })
+    .join('');
+
+  return `
+    <div class="pin-active-filters" id="pin-active-filters">
+      ${chips}
+      <button type="button" class="pin-clear-filters" id="pin-clear-filters">Clear all</button>
+    </div>`;
+}
+
+function syncPinAttrFilterMenu() {
+  const menu = document.getElementById('pin-attr-filter-menu');
+  if (!menu || view.pinFlow?.step !== 'list') return;
+  const state = pinListState();
+  const options = buildPinFilterOptions(allRecipes);
+  menu.innerHTML = renderPinAttrFilterMenuContent(options, state);
+  menu.hidden = !state.filterMenuOpen;
+  menu.classList.toggle('is-hidden', !state.filterMenuOpen);
+  document.getElementById('pin-filter-toggle')?.setAttribute('aria-expanded', String(state.filterMenuOpen));
+}
+
+function syncPinActiveFilters() {
+  const host = document.getElementById('pin-active-filters-host');
+  if (!host || view.pinFlow?.step !== 'list') return;
+  host.innerHTML = renderPinActiveFilterChips(view.pinFlow?.attrFilters);
+}
+
 function pinListCountText(stats, filter, query) {
   let text = 'Tap a coffee to view its methods and drinks.';
   if (libraryLoading) text += ' Library is still loading…';
@@ -512,18 +696,11 @@ function pinListCountText(stats, filter, query) {
 function syncPinListCount() {
   const pinListCount = document.getElementById('pin-list-count');
   if (!pinListCount || view.pinFlow?.step !== 'list') return;
-  const stats = buildPinListRows(
-    allRecipes,
-    view.pinFlow.filter || 'all',
-    view.pinFlow.search || ''
-  );
+  const state = pinListState();
+  const stats = buildPinListRows(allRecipes, state.filter, state.search, state.attrFilters);
   pinListCount.dataset.total = String(stats.total);
   pinListCount.dataset.onHome = String(stats.onHomeTotal);
-  pinListCount.textContent = pinListCountText(
-    stats,
-    view.pinFlow.filter || 'all',
-    view.pinFlow.search || ''
-  );
+  pinListCount.textContent = pinListCountText(stats, state.filter, state.search);
   const pinListEmpty = document.getElementById('pin-list-empty');
   if (pinListEmpty) pinListEmpty.hidden = stats.visible > 0 || libraryLoading;
 }
@@ -543,9 +720,9 @@ function renderPinFlow() {
         </div>`;
     }
 
-    const activeFilter = view.pinFlow.filter || 'all';
-    const searchValue = view.pinFlow.search || '';
-    const stats = buildPinListRows(allRecipes, activeFilter, searchValue);
+    const state = pinListState();
+    const stats = buildPinListRows(allRecipes, state.filter, state.search, state.attrFilters);
+    const filterOptions = buildPinFilterOptions(allRecipes);
 
     return `
       <div class="panel-backdrop" id="pin-backdrop">
@@ -555,15 +732,13 @@ function renderPinFlow() {
             <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
           </header>
           <div class="pin-toolbar">
-            <label class="pin-search">
-              <span class="pin-search-label">Search</span>
-              <input type="search" id="pin-coffee-search" class="pin-search-input" placeholder="Search coffees, methods, drinks…" autocomplete="off" value="${escapeHtml(searchValue)}" />
-            </label>
+            ${renderPinSearchBar(state.search, state, filterOptions)}
+            <div id="pin-active-filters-host">${renderPinActiveFilterChips(state.attrFilters)}</div>
             <div class="pin-filters" role="group" aria-label="Filter coffees">
-              ${renderPinFilterChips(activeFilter)}
+              ${renderPinFilterChips(state.filter)}
             </div>
             <p class="pin-list-count" id="pin-list-count" data-total="${stats.total}" data-on-home="${stats.onHomeTotal}">
-              ${escapeHtml(pinListCountText(stats, activeFilter, searchValue))}
+              ${escapeHtml(pinListCountText(stats, state.filter, state.search))}
             </p>
           </div>
           <p class="pin-empty pin-list-empty" id="pin-list-empty"${stats.visible > 0 || libraryLoading ? ' hidden' : ''}>No coffees match your search.</p>
@@ -790,22 +965,90 @@ function bindPinFlow() {
   if (view.pinFlow?.step === 'list') {
     const pinSearchInput = document.getElementById('pin-coffee-search');
     const pinListBody = document.getElementById('pin-list-body');
+    const pinToolbar = document.querySelector('.pin-toolbar');
 
     pinVirtualList = createPinVirtualList(pinListBody, {
       getRecipes: () => allRecipes,
       getFilter: () => view.pinFlow?.filter || 'all',
       getQuery: () => view.pinFlow?.search || '',
+      getAttrFilters: () => view.pinFlow?.attrFilters || [],
       renderItem: renderPinListItem,
       renderSection: renderPinSectionRow,
     });
     pinVirtualList.update();
     syncPinListCount();
+    syncPinActiveFilters();
+    syncPinAttrFilterMenu();
 
     pinSearchInput?.addEventListener('input', () => {
       view.pinFlow.search = pinSearchInput.value;
-      syncPinListCount();
-      pinVirtualList.update({ resetScroll: true });
+      refreshPinListView({ resetScroll: true });
     });
+
+    document.getElementById('pin-filter-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      view.pinFlow.filterMenuOpen = !view.pinFlow.filterMenuOpen;
+      if (!view.pinFlow.filterMenuOpen) view.pinFlow.filterMenuDimension = null;
+      render();
+    });
+
+    pinToolbar?.addEventListener('click', (e) => {
+      const dimensionBtn = e.target.closest('[data-filter-dimension]');
+      if (dimensionBtn && !dimensionBtn.disabled) {
+        e.stopPropagation();
+        view.pinFlow.filterMenuOpen = true;
+        view.pinFlow.filterMenuDimension = dimensionBtn.dataset.filterDimension;
+        render();
+        return;
+      }
+
+      const valueBtn = e.target.closest('[data-filter-option]');
+      if (valueBtn) {
+        e.stopPropagation();
+        view.pinFlow.attrFilters = toggleAttrFilter(
+          view.pinFlow.attrFilters,
+          valueBtn.dataset.filterValue,
+          valueBtn.dataset.filterOption
+        );
+        refreshPinListView({ resetScroll: true });
+        return;
+      }
+
+      const backBtn = e.target.closest('[data-filter-back]');
+      if (backBtn) {
+        e.stopPropagation();
+        view.pinFlow.filterMenuDimension = null;
+        render();
+        return;
+      }
+
+      const removeBtn = e.target.closest('[data-remove-attr-filter]');
+      if (removeBtn) {
+        e.stopPropagation();
+        view.pinFlow.attrFilters = removeAttrFilter(view.pinFlow.attrFilters, removeBtn.dataset.removeAttrFilter);
+        refreshPinListView({ resetScroll: true });
+        return;
+      }
+
+      if (e.target.closest('#pin-clear-filters')) {
+        e.stopPropagation();
+        view.pinFlow.attrFilters = [];
+        refreshPinListView({ resetScroll: true });
+        render();
+      }
+    });
+
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (!view.pinFlow?.filterMenuOpen) return;
+        if (e.target.closest('.pin-search-combo-wrap')) return;
+        view.pinFlow.filterMenuOpen = false;
+        view.pinFlow.filterMenuDimension = null;
+        render();
+      },
+      { once: true }
+    );
 
     document.querySelectorAll('[data-pin-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -815,8 +1058,7 @@ function bindPinFlow() {
           chip.classList.toggle('is-active', active);
           chip.setAttribute('aria-pressed', String(active));
         });
-        syncPinListCount();
-        pinVirtualList.update({ resetScroll: true });
+        refreshPinListView({ resetScroll: true });
       });
     });
 
@@ -851,12 +1093,10 @@ function bindPinFlow() {
 
       const recipeBtn = e.target.closest('[data-pin-recipe]');
       if (recipeBtn) {
-        view.pinFlow = {
+        view.pinFlow = pinFlowPreserveState({
           step: 'configure',
           recipeId: recipeBtn.dataset.pinRecipe,
-          filter: view.pinFlow?.filter || 'all',
-          search: view.pinFlow?.search || '',
-        };
+        });
         render();
       }
     });
@@ -867,14 +1107,12 @@ function bindPinFlow() {
   document.querySelectorAll('[data-pin-view-drink]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      view.pinFlow = {
+      view.pinFlow = pinFlowPreserveState({
         step: 'view',
         recipeId: view.pinFlow.recipeId,
         methodName: btn.dataset.pinViewMethod,
         drinkName: btn.dataset.pinViewDrink,
-        filter: view.pinFlow?.filter || 'all',
-        search: view.pinFlow?.search || '',
-      };
+      });
       render();
     });
   });
@@ -927,17 +1165,15 @@ function bindPinFlow() {
   });
 
   document.getElementById('pin-back')?.addEventListener('click', () => {
-    view.pinFlow = { step: 'list', filter: view.pinFlow?.filter || 'all', search: view.pinFlow?.search || '' };
+    view.pinFlow = pinFlowListState();
     render();
   });
 
   document.getElementById('pin-view-back')?.addEventListener('click', () => {
-    view.pinFlow = {
+    view.pinFlow = pinFlowPreserveState({
       step: 'configure',
       recipeId: view.pinFlow.recipeId,
-      filter: view.pinFlow?.filter || 'all',
-      search: view.pinFlow?.search || '',
-    };
+    });
     render();
   });
 
@@ -1536,7 +1772,14 @@ function bindShell() {
   });
   document.getElementById('btn-add')?.addEventListener('click', () => openAddView());
   document.getElementById('btn-pin-coffee')?.addEventListener('click', () => {
-    view.pinFlow = { step: 'list', filter: 'all', search: '' };
+    view.pinFlow = {
+      step: 'list',
+      filter: 'all',
+      search: '',
+      attrFilters: [],
+      filterMenuOpen: false,
+      filterMenuDimension: null,
+    };
     view.reorderMode = false;
     render();
     if (!libraryLoading) refreshRecipesInBackground();
@@ -1935,12 +2178,10 @@ function bindDetailPanel() {
 
       if (action === 'edit-pin') {
         view.panel = null;
-        view.pinFlow = {
+        view.pinFlow = pinFlowPreserveState({
           step: 'configure',
           recipeId: recipe.id,
-          filter: view.pinFlow?.filter || 'all',
-          search: view.pinFlow?.search || '',
-        };
+        });
         render();
         return;
       }
