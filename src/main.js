@@ -8,10 +8,10 @@ import {
   updateRecipe,
   saveRecipePin,
   deleteRecipe,
-  appendDrinkToRecipe,
   ensureUserDoc,
   fetchHomeOrder,
   saveHomeOrder,
+  deleteField,
 } from './api.js';
 import {
   displayName,
@@ -27,9 +27,8 @@ import {
   buildDrinkParamsFromForm,
   normalizeMethods,
   applyDrinkSave,
-  renameMethodInMethods,
-  renameMethodInPin,
   appendToPin,
+  unionPinMethods,
   deleteDrinkFromMethods,
   removeDrinkFromPinMethods,
   escapeHtml,
@@ -71,6 +70,7 @@ import {
   removeFromNameOrder,
   renameMethodInDrinkOrder,
   removeMethodFromDrinkOrder,
+  mergeDrinkIntoMethods,
 } from './utils.js';
 import {
   buildPinListRows,
@@ -88,6 +88,48 @@ import {
 } from './pinFilters.js';
 import { computeLibraryStats, donutGradient } from './stats.js';
 import { renderOriginMapPlaceholder, scheduleOriginMapMount } from './originMap.js';
+import {
+  isEspressoMethod,
+  applyEspressoDrinkSave,
+  resolveEspressoTargetDrinkKey,
+  drinksWithSameSetup,
+  espressoSetupFieldsChanged,
+  applySetupFieldsToMatchingDrinks,
+  drinkFamilyBaseName,
+  displayDrinkLabel,
+  displayPinnedAwareDrinkLabel,
+  deleteDrinkConfirmLabel,
+  formatEspressoGrinderStat,
+  buildCoffeeCardPinFromForm,
+  renderCoffeeCardSection,
+  updatePinForDrinkChanges,
+} from './espressoSetup.js';
+
+function readMethodNameFromEditForm(form) {
+  if (!form) return '';
+  const methodPreset = form.querySelector('[name="methodPreset"]');
+  if (methodPreset) {
+    return resolvePresetValue(
+      methodPreset.value,
+      form.querySelector('[name="methodCustom"]')?.value
+    ).trim();
+  }
+  return String(form.querySelector('[name="methodName"]')?.value ?? '').trim();
+}
+
+function syncEspressoBasketFieldVisibility(form) {
+  if (!form) return;
+  const methodName = readMethodNameFromEditForm(form);
+  const showBasket = isEspressoMethod(methodName);
+  form.querySelectorAll('.espresso-basket-field').forEach((field) => {
+    field.hidden = !showBasket;
+    field.classList.toggle('espresso-basket-field--hidden', !showBasket);
+    if (!showBasket) {
+      const basketInput = field.querySelector('[name="basket"]');
+      if (basketInput) basketInput.value = '';
+    }
+  });
+}
 
 const TILE_BG_COUNT = 6;
 
@@ -384,9 +426,11 @@ function readPresetFromForm(fd, presetKey, customKey) {
 }
 
 function renderTabSlot(items, active, dataAttr, className = 'method-tab', tabsClass = 'method-tabs', options = {}) {
-  const { listId = '', reorderMode = false } = options;
+  const { listId = '', reorderMode = false, labelFor: labelForOption = null } = options;
   const reorderClass = reorderMode ? ' panel-tabs-reorder-mode' : '';
-  const labelFor = (name) => (className === 'method-tab' ? displayMethodName(name) : name);
+  const labelFor =
+    labelForOption ||
+    ((name) => (className === 'method-tab' ? displayMethodName(name) : name));
   let inner;
   if (items.length >= 1) {
     inner = `<div class="${tabsClass}${reorderClass}"${listId ? ` id="${listId}"` : ''} role="tablist">
@@ -993,7 +1037,7 @@ function renderPinFlow() {
         <div class="pin-check-row">
           <label class="pin-check">
             <input type="checkbox" data-pin-method="${escapeHtml(method)}" data-pin-drink="${escapeHtml(drink)}" ${isPinChecked(recipe, method, drink) ? 'checked' : ''} />
-            <span>${escapeHtml(drink)}</span>
+            <span>${escapeHtml(displayDrinkLabel(recipe, method, drink, 'tab'))}</span>
           </label>
           <button type="button" class="pin-view-drink" data-pin-view-method="${escapeHtml(method)}" data-pin-view-drink="${escapeHtml(drink)}" title="View recipe" aria-label="View ${escapeHtml(drink)}">View</button>
           <button type="button" class="pin-delete-drink" data-pin-delete-method="${escapeHtml(method)}" data-pin-delete-drink="${escapeHtml(drink)}" title="Delete drink" aria-label="Delete ${escapeHtml(drink)}">Delete</button>
@@ -1109,12 +1153,20 @@ function renderPinRecipeView(recipe) {
               <div class="edit-grid-inline-2 edit-grid-spaced">
                 <label class="edit-field">
                   <span>Drink</span>
-                  <input type="text" value="${escapeHtml(drinkName)}" readonly />
+                  <input type="text" value="${escapeHtml(displayPinnedAwareDrinkLabel(recipe, methodName, drinkName))}" readonly />
                 </label>
                 <label class="edit-field">
                   <span>Gear</span>
                   <input type="text" value="${escapeHtml(String(data.gear || ''))}" readonly />
                 </label>
+                ${
+                  isEspressoMethod(methodName)
+                    ? `<label class="edit-field">
+                  <span>Basket</span>
+                  <input type="text" value="${escapeHtml(String(data.basket || ''))}" readonly />
+                </label>`
+                    : ''
+                }
               </div>
               <div class="edit-grid-inline-3 edit-grid-spaced">
                 <label class="edit-field">
@@ -1415,7 +1467,7 @@ function bindPinFlow() {
       const drinkName = btn.dataset.pinDeleteDrink;
       const recipe = allRecipes.find((r) => r.id === recipeId);
       if (!recipe || !methodName || !drinkName) return;
-      if (!confirm(`Delete drink "${drinkName}"? This cannot be undone.`)) return;
+      if (!confirm(`Delete drink "${deleteDrinkConfirmLabel(methodName, drinkName)}"? This cannot be undone.`)) return;
 
       const methods = deleteDrinkFromMethods(recipe.methods, methodName, drinkName);
       const pinMethods = removeDrinkFromPinMethods(recipe.pin?.methods, methodName, drinkName);
@@ -1529,7 +1581,11 @@ function renderDetailPanel() {
     'data-drink',
     'drink-tab',
     'method-tabs drink-tabs',
-    { listId: 'panel-drink-tabs', reorderMode: tabReorderMode }
+    {
+      listId: 'panel-drink-tabs',
+      reorderMode: tabReorderMode,
+      labelFor: (drinkKey) => displayPinnedAwareDrinkLabel(recipe, activeMethod, drinkKey),
+    }
   );
   const tabReorderHint = tabReorderMode
     ? '<p class="panel-tabs-reorder-hint">Drag methods and drinks to reorder, then tap OK</p>'
@@ -1549,8 +1605,11 @@ function renderDetailPanel() {
   }
 
   const ratio = formatRatio(drink);
-  const grinderLabel = drink.gear || 'Grinder';
-  const grinderValue = drink.grind || '—';
+  const grinderStat = isEspressoMethod(activeMethod)
+    ? formatEspressoGrinderStat(drink)
+    : { label: drink.gear || 'Grinder', value: drink.grind || '—' };
+  const grinderLabel = grinderStat.label;
+  const grinderValue = grinderStat.value;
 
   return `
     <div class="panel-backdrop" id="panel-backdrop">
@@ -1662,16 +1721,22 @@ function renderPanelEdit(recipe) {
   const isNewMethod = addMode === 'method';
   const isNewDrink = addMode === 'method' || addMode === 'drink';
   const isMethodEditable = isNewMethod || !addMode;
+  const isDrinkEditable = isNewDrink || !addMode;
 
   const methodName = isNewMethod ? '' : view.panel.methodName || '';
-  const drinkName = isNewDrink ? '' : view.panel.drinkName || '';
+  const drinkStorageKey = isNewDrink ? '' : view.panel.drinkName || '';
+  const drinkPresetValue =
+    drinkStorageKey && isEspressoMethod(methodName)
+      ? drinkFamilyBaseName(drinkStorageKey)
+      : drinkStorageKey;
+  const drinkName = isNewDrink ? '' : drinkPresetValue;
   const copySource =
     addMode === 'drink' && methodName && view.panel.copyFromDrink
       ? getDrinkParams(recipe, methodName, view.panel.copyFromDrink)
       : null;
   const existingDrink =
-    methodName && drinkName
-      ? methods[methodName]?.[drinkName]
+    methodName && drinkStorageKey
+      ? methods[methodName]?.[drinkStorageKey]
       : copySource;
   const data = existingDrink ? { ...emptyDrinkParams(), ...existingDrink } : emptyDrinkParams();
   const ratioDisplay = formatRatioDisplay(data.dose, data.out, data.ratio);
@@ -1737,6 +1802,7 @@ function renderPanelEdit(recipe) {
                   <input type="url" name="coffeeRoasterUrl" value="${escapeHtml(recipe.roasterUrl || '')}" placeholder="https://…" inputmode="url" />
                 </label>
               </div>
+              ${renderCoffeeCardSection(recipe, escapeHtml)}
             </div>
           </details>
 
@@ -1765,11 +1831,15 @@ function renderPanelEdit(recipe) {
                   options: DRINKS,
                   value: drinkName,
                   placeholder: 'Select drink',
-                  editable: isNewDrink,
+                  editable: isDrinkEditable,
                 })}
                 <label class="edit-field">
                   <span>Gear</span>
                   <input type="text" name="gear" value="${escapeHtml(String(data.gear || ''))}" placeholder="DF64" />
+                </label>
+                <label class="edit-field espresso-basket-field"${isEspressoMethod(methodName) ? '' : ' hidden'}>
+                  <span>Basket</span>
+                  <input type="text" name="basket" value="${escapeHtml(String(data.basket || ''))}" placeholder="Stepped" />
                 </label>
               </div>
               <div class="edit-grid-inline-3 edit-grid-spaced">
@@ -1947,6 +2017,10 @@ function renderAddForm() {
                 <span>Gear</span>
                 <input type="text" name="gear" placeholder="DF64" />
               </label>
+              <label class="edit-field espresso-basket-field" hidden>
+                <span>Basket</span>
+                <input type="text" name="basket" placeholder="Stepped" />
+              </label>
             </div>
             <div class="edit-grid-inline-3 edit-grid-spaced">
               <label class="edit-field">
@@ -2029,6 +2103,46 @@ function promptApplyScope(methodName, drinkName, allDrinks) {
         <div class="scope-actions">
           <button type="button" class="btn btn-secondary" data-scope="one">This drink only</button>
           <button type="button" class="btn btn-primary" data-scope="all">All ${escapeHtml(methodName)} drinks</button>
+        </div>
+        <button type="button" class="scope-cancel" data-scope="cancel">Cancel</button>
+      </div>
+    `;
+
+    const close = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close(null);
+    });
+    backdrop.querySelectorAll('[data-scope]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const scope = btn.dataset.scope;
+        close(scope === 'cancel' ? null : scope);
+      });
+    });
+
+    document.body.appendChild(backdrop);
+  });
+}
+
+function promptEspressoSetupScope(_recipe, _methodName, _editingDrinkKey, _drinkParams, peerDrinkKeys) {
+  if (!peerDrinkKeys.length) return Promise.resolve('one');
+
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'scope-backdrop';
+    backdrop.innerHTML = `
+      <div class="scope-dialog" role="dialog" aria-labelledby="scope-setup-title">
+        <h3 id="scope-setup-title" class="scope-title">Apply shared setup?</h3>
+        <p class="scope-text">
+          You updated the brew settings for this drink. Do you want to apply the changes to all
+          drinks with the same gear setup?
+        </p>
+        <div class="scope-actions">
+          <button type="button" class="btn btn-secondary" data-scope="one">This drink only</button>
+          <button type="button" class="btn btn-primary" data-scope="setup">Same setup drinks</button>
         </div>
         <button type="button" class="scope-cancel" data-scope="cancel">Cancel</button>
       </div>
@@ -2538,7 +2652,21 @@ function bindDetailPanel() {
 
   if (view.panel.editing) {
     bindPanelEdit(recipe);
-    bindPresetSelects(document.getElementById('form-method'));
+    const editForm = document.getElementById('form-method');
+    bindPresetSelects(editForm);
+    syncEspressoBasketFieldVisibility(editForm);
+    editForm?.addEventListener('change', (e) => {
+      if (
+        e.target.matches('[name="methodPreset"], [name="methodCustom"], [name="methodName"]')
+      ) {
+        syncEspressoBasketFieldVisibility(editForm);
+      }
+    });
+    editForm?.addEventListener('input', (e) => {
+      if (e.target.matches('[name="methodCustom"], [name="methodName"]')) {
+        syncEspressoBasketFieldVisibility(editForm);
+      }
+    });
   } else {
     if (view.panel.tabReorderMode) {
       bindPanelTabReorder();
@@ -2615,13 +2743,14 @@ function bindPanelEdit(recipe) {
     const isNewMethod = addMode === 'method';
     const isNewDrink = addMode === 'method' || addMode === 'drink';
     const isMethodEditable = isNewMethod || !addMode;
+    const isDrinkEditable = isNewDrink || !addMode;
     const methodName = (
       isMethodEditable
         ? readPresetFromForm(fd, 'methodPreset', 'methodCustom')
         : String(fd.get('methodName') ?? view.panel.methodName ?? '').trim()
     );
-    const drinkName = (
-      isNewDrink
+    let drinkName = (
+      isDrinkEditable
         ? readPresetFromForm(fd, 'drinkPreset', 'drinkCustom')
         : String(fd.get('drinkName') ?? view.panel.drinkName ?? '').trim()
     );
@@ -2631,20 +2760,20 @@ function bindPanelEdit(recipe) {
     }
 
     try {
-    const drinkParams = buildDrinkParamsFromForm(fd);
+    let drinkParams = buildDrinkParamsFromForm(fd);
+    if (!isEspressoMethod(methodName)) {
+      delete drinkParams.basket;
+    }
     const prevMethod = view.panel.methodName;
     const prevDrink = view.panel.drinkName;
     let methods = normalizeMethods(recipe.methods);
-    const methodRenamed = Boolean(prevMethod && prevMethod !== methodName && !addMode);
-
-    if (methodRenamed) {
-      methods = renameMethodInMethods(methods, prevMethod, methodName);
-    }
+    const methodChanged = Boolean(prevMethod && prevMethod !== methodName && !addMode);
 
     const drinksForMethod = drinkNames(methods, methodName);
     const shouldAskScope =
+      !isEspressoMethod(methodName) &&
       !view.panel.addMode &&
-      !methodRenamed &&
+      !methodChanged &&
       drinksForMethod.length > 1 &&
       drinksForMethod.includes(prevDrink);
 
@@ -2678,22 +2807,132 @@ function bindPanelEdit(recipe) {
     });
 
     const isAddingDrink = view.panel.addMode === 'drink';
-    const prevDrinkForSave = isAddingDrink || view.panel.addMode === 'method' ? null : prevDrink;
-
-    const updatedMethods = applyDrinkSave(
-      methods,
-      methodName,
-      drinkName,
-      drinkParams,
-      applyScope,
-      prevDrinkForSave
+    const prevDrinkForSave =
+      isAddingDrink || view.panel.addMode === 'method' || methodChanged ? null : prevDrink;
+    const drinkTypeChanged =
+      Boolean(prevDrink) &&
+      drinkFamilyBaseName(prevDrink).trim().toLowerCase() !==
+        drinkFamilyBaseName(drinkName).trim().toLowerCase();
+    const espressoDrinkTypeChanged = isEspressoMethod(methodName) && drinkTypeChanged;
+    const savedAsNewDrink = !addMode && (methodChanged || drinkTypeChanged);
+    const sourceDrinkWasPinned = Boolean(
+      prevMethod &&
+        prevDrink &&
+        recipe.pin?.methods?.[prevMethod]?.includes(prevDrink)
     );
 
+    let updatedMethods = methods;
+    let savedDrinkName = drinkName;
+    let removedDrinkKeys = [];
+    let espressoSetupScope = 'one';
+
+    if (isEspressoMethod(methodName)) {
+      const addModeActive = Boolean(view.panel.addMode);
+      if (!addModeActive && prevDrinkForSave) {
+        const prevParams = getDrinkParams(recipe, methodName, prevDrinkForSave);
+        if (espressoSetupFieldsChanged(prevParams, drinkParams)) {
+          const targetPreview = resolveEspressoTargetDrinkKey(
+            methods,
+            methodName,
+            drinkName,
+            drinkParams,
+            { prevDrink: prevDrinkForSave, addMode: false }
+          );
+          const peers = drinksWithSameSetup(methods, methodName, drinkParams, {
+            exceptKey: targetPreview,
+          });
+          if (peers.length) {
+            espressoSetupScope = await promptEspressoSetupScope(
+              recipe,
+              methodName,
+              prevDrinkForSave,
+              drinkParams,
+              peers
+            );
+            if (!espressoSetupScope) return;
+          }
+        }
+      }
+
+      const espressoSave = applyEspressoDrinkSave(methods, methodName, drinkName, drinkParams, {
+        prevDrink: prevDrinkForSave,
+        addMode: addModeActive,
+      });
+      updatedMethods = espressoSave.methods;
+      savedDrinkName = espressoSave.targetDrinkKey;
+      removedDrinkKeys = espressoSave.removedDrinkKeys;
+
+      if (espressoSetupScope === 'setup') {
+        updatedMethods = applySetupFieldsToMatchingDrinks(updatedMethods, methodName, drinkParams);
+      }
+    } else {
+      updatedMethods = applyDrinkSave(
+        methods,
+        methodName,
+        drinkName,
+        drinkParams,
+        applyScope,
+        prevDrinkForSave
+      );
+    }
+
+    drinkName = savedDrinkName;
+
+    const keepPreviousDrinkPinned =
+      !addMode &&
+      prevMethod &&
+      prevDrink &&
+      drinkName !== prevDrink &&
+      updatedMethods[prevMethod]?.[prevDrink];
+    const pinAppendNewDrink = savedAsNewDrink || keepPreviousDrinkPinned;
+
     const recipeUpdates = { methods: updatedMethods, ...coffeeUpdates };
-    if (methodRenamed && recipe.pin) {
-      recipeUpdates.pin = renameMethodInPin(recipe.pin, prevMethod, methodName);
+    const coffeeCardPinForm = form.querySelector('[data-coffee-card-pin]');
+    let pinUpdate;
+
+    if (coffeeCardPinForm) {
+      pinUpdate = buildCoffeeCardPinFromForm(form);
+      if (pinAppendNewDrink && hasActivePin(recipe)) {
+        pinUpdate = unionPinMethods(recipe.pin, pinUpdate);
+      }
+      if (isEspressoMethod(methodName) && !pinAppendNewDrink) {
+        pinUpdate = updatePinForDrinkChanges(pinUpdate, methodName, {
+          removedDrinkKeys,
+          prevDrink: prevDrinkForSave,
+          nextDrink: drinkName,
+        });
+      }
     } else if ((addMode === 'method' || addMode === 'drink') && hasActivePin(recipe)) {
-      recipeUpdates.pin = appendToPin(recipe.pin, methodName, drinkName);
+      pinUpdate = appendToPin(recipe.pin, methodName, drinkName);
+    } else if (isEspressoMethod(methodName) && !pinAppendNewDrink) {
+      pinUpdate = updatePinForDrinkChanges(recipe.pin, methodName, {
+        removedDrinkKeys,
+        prevDrink: prevDrinkForSave,
+        nextDrink: drinkName,
+      });
+    }
+
+    const recipeUsesPin = hasActivePin(recipe) || Boolean(pinUpdate?.methods);
+    if (pinAppendNewDrink && recipeUsesPin && methodName && drinkName) {
+      let pinBase = pinUpdate ?? recipe.pin ?? { methods: {} };
+      if (sourceDrinkWasPinned && prevMethod && prevDrink) {
+        pinBase = appendToPin(pinBase, prevMethod, prevDrink);
+      }
+      pinUpdate = appendToPin(pinBase, methodName, drinkName);
+    }
+
+    if (pinAppendNewDrink && removedDrinkKeys.length) {
+      pinUpdate = updatePinForDrinkChanges(pinUpdate ?? recipe.pin, methodName, {
+        removedDrinkKeys,
+        prevDrink: null,
+        nextDrink: null,
+      });
+    }
+
+    if (coffeeCardPinForm) {
+      recipeUpdates.pin = pinUpdate?.methods ? pinUpdate : deleteField();
+    } else if (pinUpdate && pinUpdate !== recipe.pin) {
+      recipeUpdates.pin = pinUpdate?.methods ? pinUpdate : deleteField();
     }
 
     let methodOrder = Array.isArray(recipe.methodOrder)
@@ -2706,19 +2945,32 @@ function bindPanelEdit(recipe) {
     if ((addMode === 'method' || addMode === 'drink') && methodName && drinkName) {
       drinkOrder[methodName] = appendToNameOrder(drinkOrder[methodName], drinkName);
     }
-    if (methodRenamed) {
-      methodOrder = renameInNameOrder(methodOrder, prevMethod, methodName);
-      drinkOrder = renameMethodInDrinkOrder(drinkOrder, prevMethod, methodName) || {};
+    for (const removed of removedDrinkKeys) {
+      drinkOrder[methodName] = removeFromNameOrder(drinkOrder[methodName], removed);
     }
-    if (!addMode && prevDrink && prevDrink !== drinkName && methodName) {
-      drinkOrder[methodName] = renameInNameOrder(drinkOrder[methodName], prevDrink, drinkName);
+    if (methodChanged && methodName) {
+      methodOrder = appendToNameOrder(methodOrder, methodName);
+      drinkOrder[methodName] = appendToNameOrder(drinkOrder[methodName], drinkName);
+    }
+    if (!addMode && prevDrinkForSave && prevDrinkForSave !== drinkName && methodName) {
+      if (espressoDrinkTypeChanged) {
+        drinkOrder[methodName] = appendToNameOrder(drinkOrder[methodName], drinkName);
+      } else {
+        drinkOrder[methodName] = renameInNameOrder(
+          drinkOrder[methodName],
+          prevDrinkForSave,
+          drinkName
+        );
+      }
     }
     recipeUpdates.methodOrder = methodOrder;
     recipeUpdates.drinkOrder = drinkOrder;
 
     await updateRecipe(currentUser.uid, recipe.id, recipeUpdates);
     recipe.methods = updatedMethods;
-    if (recipeUpdates.pin) recipe.pin = recipeUpdates.pin;
+    if ('pin' in recipeUpdates) {
+      recipe.pin = recipeUpdates.pin?.methods ? recipeUpdates.pin : undefined;
+    }
     Object.assign(recipe, coffeeUpdates);
     recipe.methodOrder = methodOrder;
     recipe.drinkOrder = drinkOrder;
@@ -2728,7 +2980,9 @@ function bindPanelEdit(recipe) {
       allRecipes[allIdx] = {
         ...allRecipes[allIdx],
         methods: updatedMethods,
-        ...(recipeUpdates.pin ? { pin: recipeUpdates.pin } : {}),
+        ...('pin' in recipeUpdates
+          ? { pin: recipeUpdates.pin?.methods ? recipeUpdates.pin : undefined }
+          : {}),
         ...coffeeUpdates,
         methodOrder,
         drinkOrder,
@@ -2751,7 +3005,7 @@ function bindPanelEdit(recipe) {
   document.getElementById('btn-delete-drink')?.addEventListener('click', async () => {
     const methodName = view.panel.methodName;
     const drinkName = view.panel.drinkName;
-    if (!methodName || !drinkName || !confirm(`Delete drink "${drinkName}"?`)) return;
+    if (!methodName || !drinkName || !confirm(`Delete drink "${deleteDrinkConfirmLabel(methodName, drinkName)}"?`)) return;
 
     const methods = normalizeMethods(recipe.methods);
     if (methods[methodName]) {
@@ -2831,7 +3085,13 @@ function bindAddForm() {
     });
   });
 
-  bindPresetSelects(document.getElementById('form-add'));
+  const addForm = document.getElementById('form-add');
+  bindPresetSelects(addForm);
+  syncEspressoBasketFieldVisibility(addForm);
+  addForm?.querySelectorAll('[name="methodPreset"], [name="methodCustom"]').forEach((el) => {
+    el.addEventListener('change', () => syncEspressoBasketFieldVisibility(addForm));
+    el.addEventListener('input', () => syncEspressoBasketFieldVisibility(addForm));
+  });
 
   document.getElementById('form-add')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2857,27 +3117,43 @@ function bindAddForm() {
     if (!existing) existing = findMatchingRecipe(allKnownRecipes(), beanData);
 
     if (existing && drinkParams) {
-      const updated = await appendDrinkToRecipe(
-        currentUser.uid,
-        existing.id,
-        methodName,
-        drinkName,
-        drinkParams
-      );
+      let methods = normalizeMethods(existing.methods);
+      let savedDrinkName = drinkName;
+      if (isEspressoMethod(methodName)) {
+        const espressoSave = applyEspressoDrinkSave(methods, methodName, drinkName, drinkParams, {
+          addMode: true,
+        });
+        methods = espressoSave.methods;
+        savedDrinkName = espressoSave.targetDrinkKey;
+      } else {
+        methods = mergeDrinkIntoMethods(methods, methodName, drinkName, drinkParams);
+      }
+
+      await updateRecipe(currentUser.uid, existing.id, { methods, isOpen: true });
+      const updated = { ...existing, methods, isOpen: true };
       const allIdx = allRecipes.findIndex((r) => r.id === existing.id);
       if (allIdx >= 0) allRecipes[allIdx] = updated;
       else allRecipes.unshift(updated);
       refreshHomeRecipes();
 
       view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
-      openPanel(updated.id, methodName, drinkName);
+      openPanel(updated.id, methodName, savedDrinkName);
       render();
       return;
     }
 
     let methods = {};
+    let savedDrinkName = drinkName;
     if (methodName && drinkName && drinkParams) {
-      methods[methodName] = { [drinkName]: drinkParams };
+      if (isEspressoMethod(methodName)) {
+        const espressoSave = applyEspressoDrinkSave({}, methodName, drinkName, drinkParams, {
+          addMode: true,
+        });
+        methods = espressoSave.methods;
+        savedDrinkName = espressoSave.targetDrinkKey;
+      } else {
+        methods[methodName] = { [drinkName]: drinkParams };
+      }
     }
 
     const created = await createRecipe(currentUser.uid, { ...beanData, methods });
@@ -2886,7 +3162,7 @@ function bindAddForm() {
     await persistHomeOrder();
     refreshHomeRecipes();
     view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
-    openPanel(created.id, methodName || null, drinkName || null);
+    openPanel(created.id, methodName || null, savedDrinkName || null);
     render();
   });
 }

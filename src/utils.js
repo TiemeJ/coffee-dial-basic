@@ -86,6 +86,7 @@ export const ROAST_TYPES = ['Light', 'Medium', 'Medium-Dark', 'Dark'];
 
 export const BREWING_METHODS = [
   'Espresso',
+  'Manual espresso',
   'V60',
   'Hario Switch',
   'Clever Dripper',
@@ -158,7 +159,7 @@ export function normalizeRoasterUrl(value) {
   return `https://${raw}`;
 }
 
-const DRINK_PARAM_KEYS = ['dose', 'out', 'grind', 'time', 'temp', 'gear', 'ratio', 'notes', 'improve', 'rating'];
+const DRINK_PARAM_KEYS = ['dose', 'out', 'grind', 'time', 'temp', 'gear', 'basket', 'ratio', 'notes', 'improve', 'rating'];
 
 export function isDrinkParams(obj) {
   if (!obj || typeof obj !== 'object') return false;
@@ -336,6 +337,16 @@ export function appendToPin(pin, methodName, drinkName) {
   return { methods };
 }
 
+export function unionPinMethods(basePin, extraPin) {
+  const methods = { ...(basePin?.methods || {}) };
+  for (const [method, drinks] of Object.entries(extraPin?.methods || {})) {
+    if (!Array.isArray(drinks) || !drinks.length) continue;
+    const merged = new Set([...(methods[method] || []), ...drinks]);
+    methods[method] = [...merged].sort((a, b) => a.localeCompare(b));
+  }
+  return Object.keys(methods).length ? { methods } : undefined;
+}
+
 export function deleteDrinkFromMethods(methods, methodName, drinkName) {
   const normalized = normalizeMethods(methods);
   if (!normalized[methodName]?.[drinkName]) return normalized;
@@ -495,6 +506,7 @@ export function emptyDrinkParams() {
     time: '',
     temp: '',
     gear: '',
+    basket: '',
     ratio: '',
     notes: '',
     improve: '',
@@ -507,7 +519,7 @@ export function buildDrinkParamsFromForm(fd) {
   const out = String(fd.get('out') ?? '').trim();
   const ratio = computeRatio(dose, out);
   const params = {};
-  for (const key of ['dose', 'out', 'grind', 'time', 'temp', 'gear']) {
+  for (const key of ['dose', 'out', 'grind', 'time', 'temp', 'gear', 'basket']) {
     const val = String(fd.get(key) ?? '').trim();
     if (val) params[key] = val;
   }

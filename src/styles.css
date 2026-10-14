@@ -725,6 +725,44 @@ input {
   margin: 0.45rem 0 0;
 }
 
+.coffee-card-section {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.coffee-card-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.coffee-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.coffee-card-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.coffee-card-method {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.coffee-card-drink {
+  font-weight: 600;
+}
+
 .stats-origin-list {
   list-style: none;
   margin: 0;
@@ -2124,6 +2162,11 @@ input {
 
 .preset-custom[hidden] {
   display: none;
+}
+
+.espresso-basket-field[hidden],
+.espresso-basket-field.espresso-basket-field--hidden {
+  display: none !important;
 }
 
 .field-hint {

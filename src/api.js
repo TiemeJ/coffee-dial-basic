@@ -21,6 +21,7 @@ import { generateCoffeeName, normalizeRecipe, mergeDrinkIntoMethods } from './ut
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export { deleteField };
 
 const provider = new GoogleAuthProvider();
 
