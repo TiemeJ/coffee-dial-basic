@@ -89,6 +89,11 @@ import {
 import { computeLibraryStats, donutGradient } from './stats.js';
 import { renderOriginMapPlaceholder, scheduleOriginMapMount } from './originMap.js';
 import {
+  collectGearNames,
+  buildGrindOffsetPlan,
+  parseGrindOffsetDelta,
+} from './grinderOffset.js';
+import {
   isEspressoMethod,
   applyEspressoDrinkSave,
   resolveEspressoTargetDrinkKey,
@@ -621,15 +626,45 @@ function renderPinStatsIcon() {
   </svg>`;
 }
 
+function renderPinSettingsIcon() {
+  return `<svg class="pin-stats-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+      stroke="currentColor"
+      stroke-width="2"
+    />
+    <path
+      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>`;
+}
+
+const PIN_SETTINGS_SCREENS = [
+  {
+    id: 'grinder-offset',
+    title: 'Grinder offset',
+    description: 'Shift saved grind numbers after zeroing or cleaning a grinder.',
+  },
+];
+
 function renderPinFiltersRow(activeFilter) {
   return `
     <div class="pin-filters-row">
       <div class="pin-filters" role="group" aria-label="Filter coffees">
         ${renderPinFilterChips(activeFilter)}
       </div>
-      <button type="button" class="pin-stats-btn" id="pin-open-stats" title="Statistics" aria-label="Statistics">
-        ${renderPinStatsIcon()}
-      </button>
+      <div class="pin-toolbar-actions">
+        <button type="button" class="pin-stats-btn" id="pin-open-settings" title="Settings" aria-label="Settings">
+          ${renderPinSettingsIcon()}
+        </button>
+        <button type="button" class="pin-stats-btn" id="pin-open-stats" title="Statistics" aria-label="Statistics">
+          ${renderPinStatsIcon()}
+        </button>
+      </div>
     </div>`;
 }
 
@@ -795,6 +830,142 @@ function renderPinStatsContent(data, statsExpanded = {}) {
       renderOriginsBody(data.origins),
       Boolean(statsExpanded.origins)
     )}`;
+}
+
+const GRINDER_OFFSET_PREVIEW_MAX = 40;
+
+function renderPinSettingsFlow() {
+  const rows = PIN_SETTINGS_SCREENS.map(
+    (item) => `
+      <li>
+        <button type="button" class="pin-settings-row" data-settings-screen="${escapeHtml(item.id)}">
+          <span class="pin-settings-row-text">
+            <span class="pin-settings-row-title">${escapeHtml(item.title)}</span>
+            <span class="pin-settings-row-desc">${escapeHtml(item.description)}</span>
+          </span>
+          <span class="pin-settings-row-chevron" aria-hidden="true">›</span>
+        </button>
+      </li>`
+  ).join('');
+
+  return `
+    <div class="panel-backdrop" id="pin-backdrop">
+      <div class="pin-panel pin-panel-settings" role="dialog">
+        <header class="pin-header">
+          <h2>Settings</h2>
+          <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
+        </header>
+        <p class="pin-hint">Library tools and preferences.</p>
+        <ul class="pin-settings-list">${rows}</ul>
+        <footer class="stats-footer">
+          <button type="button" class="edit-footer-discard" id="pin-settings-back">Back to search</button>
+        </footer>
+      </div>
+    </div>`;
+}
+
+function renderPinGrinderOffsetFlow() {
+  const gears = collectGearNames(allRecipes);
+  const selectedGear = view.pinFlow.grinderGear ?? gears[0] ?? '';
+  const deltaValue = view.pinFlow.grinderDelta ?? '';
+  const plan = view.pinFlow.grinderPlan;
+  const applying = Boolean(view.pinFlow.grinderApplying);
+
+  const gearOptions = gears.length
+    ? gears
+        .map(
+          (g) =>
+            `<option value="${escapeHtml(g)}" ${g === selectedGear ? 'selected' : ''}>${escapeHtml(g)}</option>`
+        )
+        .join('')
+    : '<option value="">No grinders in library</option>';
+
+  let previewHtml = '';
+  if (plan) {
+    const uniqueCoffees = new Set(plan.changes.map((c) => c.recipeId)).size;
+    const rows = plan.changes
+      .slice(0, GRINDER_OFFSET_PREVIEW_MAX)
+      .map(
+        (row) => `
+        <li class="grinder-offset-row">
+          <span class="grinder-offset-row-coffee">${escapeHtml(row.coffeeLabel)}</span>
+          <span class="grinder-offset-row-meta">${escapeHtml(row.methodName)} · ${escapeHtml(row.drinkName)}</span>
+          <span class="grinder-offset-row-values">${escapeHtml(row.oldGrind)} → ${escapeHtml(row.newGrind)}</span>
+        </li>`
+      )
+      .join('');
+    const more =
+      plan.changes.length > GRINDER_OFFSET_PREVIEW_MAX
+        ? `<p class="grinder-offset-more">…and ${plan.changes.length - GRINDER_OFFSET_PREVIEW_MAX} more.</p>`
+        : '';
+    const skippedNote =
+      plan.skipped.length > 0
+        ? `<p class="grinder-offset-skipped">${plan.skipped.length} drink${plan.skipped.length === 1 ? '' : 's'} skipped (non-numeric grind or would go below zero).</p>`
+        : '';
+
+    previewHtml = `
+      <div class="grinder-offset-preview">
+        <p class="grinder-offset-summary">
+          <strong>${plan.changes.length}</strong> drink${plan.changes.length === 1 ? '' : 's'} across
+          <strong>${uniqueCoffees}</strong> coffee${uniqueCoffees === 1 ? '' : 's'} using
+          <strong>${escapeHtml(plan.gearName)}</strong>
+          (${plan.delta >= 0 ? '+' : ''}${escapeHtml(String(plan.delta))} grind).
+        </p>
+        ${plan.changes.length ? `<ul class="grinder-offset-list">${rows}</ul>${more}` : '<p class="pin-empty">No numeric grind values matched this grinder.</p>'}
+        ${skippedNote}
+      </div>`;
+  }
+
+  return `
+    <div class="panel-backdrop" id="pin-backdrop">
+      <div class="pin-panel pin-panel-grinder-tools" role="dialog">
+        <header class="pin-header">
+          <div>
+            <h2>Grinder offset</h2>
+            <p class="pin-subtitle">Shift saved grind numbers after zeroing or cleaning a grinder.</p>
+          </div>
+          <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
+        </header>
+        <form id="grinder-offset-form" class="grinder-offset-form">
+          <label class="grinder-offset-field">
+            <span>Grinder (gear)</span>
+            <select name="grinderGear" class="edit-select" ${gears.length ? '' : 'disabled'}>
+              ${gearOptions}
+            </select>
+          </label>
+          <label class="grinder-offset-field">
+            <span>Adjust grind by</span>
+            <input
+              type="text"
+              name="grinderDelta"
+              inputmode="decimal"
+              placeholder="e.g. -2"
+              value="${escapeHtml(deltaValue)}"
+              required
+            />
+            <span class="field-hint">Use negative numbers after the zero moved coarser (e.g. −2).</span>
+          </label>
+          <div class="grinder-offset-actions">
+            <button type="submit" class="btn btn-secondary" name="action" value="preview" ${gears.length ? '' : 'disabled'}>
+              Preview changes
+            </button>
+            <button
+              type="submit"
+              class="btn btn-save"
+              name="action"
+              value="apply"
+              ${plan?.changes?.length && !applying ? '' : 'disabled'}
+            >
+              ${applying ? 'Saving…' : 'Apply to library'}
+            </button>
+          </div>
+          ${previewHtml}
+        </form>
+        <footer class="stats-footer">
+          <button type="button" class="edit-footer-discard" id="pin-grinder-offset-back">Back to settings</button>
+        </footer>
+      </div>
+    </div>`;
 }
 
 function renderPinStatsFlow() {
@@ -979,6 +1150,14 @@ function syncPinListCount() {
 function renderPinFlow() {
   if (view.pinFlow.step === 'stats') {
     return renderPinStatsFlow();
+  }
+
+  if (view.pinFlow.step === 'settings') {
+    return renderPinSettingsFlow();
+  }
+
+  if (view.pinFlow.step === 'grinder-offset') {
+    return renderPinGrinderOffsetFlow();
   }
 
   if (view.pinFlow.step === 'list') {
@@ -1243,6 +1422,109 @@ function bindPinFlow() {
     render();
   });
 
+  if (view.pinFlow?.step === 'settings') {
+    document.getElementById('pin-settings-back')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowListState();
+      render();
+    });
+
+    document.querySelectorAll('[data-settings-screen]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const screen = btn.dataset.settingsScreen;
+        if (screen === 'grinder-offset') {
+          const gears = collectGearNames(allRecipes);
+          view.pinFlow = pinFlowPreserveState({
+            step: 'grinder-offset',
+            grinderGear: gears[0] || '',
+            grinderDelta: view.pinFlow?.grinderDelta ?? '',
+            grinderPlan: null,
+            grinderApplying: false,
+          });
+          render();
+        }
+      });
+    });
+
+    return;
+  }
+
+  if (view.pinFlow?.step === 'grinder-offset') {
+    document.getElementById('pin-grinder-offset-back')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowPreserveState({
+        step: 'settings',
+        grinderPlan: null,
+        grinderApplying: false,
+      });
+      render();
+    });
+
+    document.getElementById('grinder-offset-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const submitter = e.submitter;
+      const action = submitter?.value || 'preview';
+      const fd = new FormData(form);
+      const grinderGear = String(fd.get('grinderGear') ?? '').trim();
+      const grinderDelta = String(fd.get('grinderDelta') ?? '').trim();
+      view.pinFlow.grinderGear = grinderGear;
+      view.pinFlow.grinderDelta = grinderDelta;
+
+      const delta = parseGrindOffsetDelta(grinderDelta);
+      if (!grinderGear) {
+        alert('Choose a grinder from your saved recipes.');
+        return;
+      }
+      if (delta === null) {
+        alert('Enter a valid offset (e.g. -2 or 1.5).');
+        return;
+      }
+
+      const plan = buildGrindOffsetPlan(allRecipes, grinderGear, delta);
+      view.pinFlow.grinderPlan = plan;
+
+      if (action === 'preview') {
+        render();
+        return;
+      }
+
+      if (!plan.changes.length) {
+        alert('Nothing to update. Preview changes first or check your grinder and offset.');
+        return;
+      }
+
+      const coffeeCount = new Set(plan.changes.map((c) => c.recipeId)).size;
+      const deltaLabel = `${delta >= 0 ? '+' : ''}${delta}`;
+      if (
+        !confirm(
+          `Apply ${deltaLabel} to grind on ${plan.changes.length} drink(s) across ${coffeeCount} coffee(s) for ${grinderGear}?`
+        )
+      ) {
+        render();
+        return;
+      }
+
+      try {
+        view.pinFlow.grinderApplying = true;
+        render();
+        for (const [recipeId, methods] of plan.recipeUpdates) {
+          await updateRecipe(currentUser.uid, recipeId, { methods });
+          patchRecipeInMemory(recipeId, { methods });
+        }
+        view.pinFlow.grinderApplying = false;
+        view.pinFlow.grinderPlan = buildGrindOffsetPlan(allRecipes, grinderGear, delta);
+        alert(`Updated ${plan.changes.length} drink${plan.changes.length === 1 ? '' : 's'}.`);
+        render();
+      } catch (err) {
+        console.error(err);
+        view.pinFlow.grinderApplying = false;
+        alert('Could not save all changes. Some recipes may have been updated — refresh and try again.');
+        render();
+      }
+    });
+
+    return;
+  }
+
   if (view.pinFlow?.step === 'stats') {
     if (view.pinFlow.statsLoading) schedulePinStatsCompute();
     if (view.pinFlow.statsExpanded?.origins) {
@@ -1390,6 +1672,11 @@ function bindPinFlow() {
         });
         refreshPinListView({ resetScroll: true });
       });
+    });
+
+    document.getElementById('pin-open-settings')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowListState({ step: 'settings' });
+      render();
     });
 
     document.getElementById('pin-open-stats')?.addEventListener('click', () => {
