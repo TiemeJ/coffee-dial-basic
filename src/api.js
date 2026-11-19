@@ -24,8 +24,14 @@ export const db = getFirestore(app);
 export { deleteField };
 
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 
 export function signInWithGoogle() {
+  return signInWithPopup(auth, provider);
+}
+
+export async function switchGoogleAccount() {
+  await signOut(auth);
   return signInWithPopup(auth, provider);
 }
 

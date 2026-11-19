@@ -1,6 +1,8 @@
 import {
   onAuthChange,
   signInWithGoogle,
+  switchGoogleAccount,
+  logOut,
   fetchAllRecipes,
   fetchRecipesByIds,
   fetchRecipe,
@@ -205,7 +207,7 @@ let recipes = [];
 let allRecipes = [];
 let homeOrder = [];
 let beanTemplates = [];
-let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
+let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false, accountMenuOpen: false };
 let pinVirtualList = null;
 let recipesFetchToken = 0;
 let libraryLoading = false;
@@ -526,9 +528,44 @@ function renderBrandIcon() {
 }
 
 function renderShell(content) {
-  const photo = currentUser.photoURL
-    ? `<img src="${escapeHtml(currentUser.photoURL)}" alt="" class="avatar" />`
-    : `<span class="avatar avatar-fallback">${initials(currentUser.displayName)}</span>`;
+  const accountMenuOpen = Boolean(view.accountMenuOpen);
+  const accountName = String(currentUser.displayName || '').trim() || 'Signed in';
+  const accountEmail = String(currentUser.email || '').trim();
+  const photoInner = currentUser.photoURL
+    ? `<img src="${escapeHtml(currentUser.photoURL)}" alt="" class="avatar header-avatar" />`
+    : `<span class="avatar avatar-fallback header-avatar">${initials(currentUser.displayName)}</span>`;
+  const accountControl = `
+    <div class="header-account-wrap">
+      <button
+        type="button"
+        class="header-account-btn"
+        id="btn-account"
+        title="Account"
+        aria-label="Account"
+        aria-haspopup="menu"
+        aria-expanded="${accountMenuOpen}"
+        aria-controls="header-account-menu"
+      >
+        ${photoInner}
+      </button>
+      <div
+        class="header-account-menu${accountMenuOpen ? '' : ' is-hidden'}"
+        id="header-account-menu"
+        role="menu"
+        ${accountMenuOpen ? '' : 'hidden'}
+      >
+        <div class="header-account-identity">
+          <span class="header-account-name">${escapeHtml(accountName)}</span>
+          ${accountEmail ? `<span class="header-account-email">${escapeHtml(accountEmail)}</span>` : ''}
+        </div>
+        <button type="button" class="header-account-action" id="btn-switch-account" role="menuitem">
+          Switch account
+        </button>
+        <button type="button" class="header-account-action header-account-action-muted" id="btn-sign-out" role="menuitem">
+          Sign out
+        </button>
+      </div>
+    </div>`;
 
   const showReorder = view.name === 'home' && recipes.length >= 2;
   const reorderIconUrl = `${import.meta.env.BASE_URL}images/reorder-icon.png`;
@@ -555,7 +592,7 @@ function renderShell(content) {
           </svg>
         </button>
         ${reorderBtn}
-        ${photo}
+        ${accountControl}
       </div>
     </header>
     <main class="main">${content}</main>
@@ -2509,6 +2546,51 @@ function bindShell() {
     }
     render();
   });
+
+  const accountBtn = document.getElementById('btn-account');
+
+  accountBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    view.accountMenuOpen = !view.accountMenuOpen;
+    render();
+  });
+
+  document.getElementById('btn-switch-account')?.addEventListener('click', async () => {
+    view.accountMenuOpen = false;
+    view.panel = null;
+    view.pinFlow = null;
+    view.reorderMode = false;
+    try {
+      await switchGoogleAccount();
+    } catch (err) {
+      if (err?.code === 'auth/popup-closed-by-user') return;
+      console.error(err);
+      alert('Could not switch account. Please try again.');
+    }
+  });
+
+  document.getElementById('btn-sign-out')?.addEventListener('click', async () => {
+    view.accountMenuOpen = false;
+    view.panel = null;
+    view.pinFlow = null;
+    view.reorderMode = false;
+    try {
+      await logOut();
+    } catch (err) {
+      console.error(err);
+      alert('Could not sign out. Please try again.');
+    }
+  });
+
+  if (view.accountMenuOpen) {
+    const closeMenu = (e) => {
+      if (e.target.closest('.header-account-wrap')) return;
+      view.accountMenuOpen = false;
+      document.removeEventListener('click', closeMenu);
+      render();
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  }
 }
 
 function bindHome() {

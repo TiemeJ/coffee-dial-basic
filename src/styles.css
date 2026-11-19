@@ -165,7 +165,8 @@ input {
 
 .btn-icon,
 .btn-pin-header,
-.btn-reorder-header {
+.btn-reorder-header,
+.header-account-btn {
   box-sizing: border-box;
   width: 2.5rem;
   height: 2rem;
@@ -183,7 +184,8 @@ input {
 
 .btn-icon:hover,
 .btn-pin-header:hover,
-.btn-reorder-header:hover {
+.btn-reorder-header:hover,
+.header-account-btn:hover {
   border-color: var(--text-muted);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -214,6 +216,35 @@ input {
   border: 1px solid var(--border);
 }
 
+.header-account-btn {
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.header-account-btn .header-avatar {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: inherit;
+  flex-shrink: 0;
+}
+
+.header-account-btn img.header-avatar {
+  display: block;
+}
+
+.header-account-btn .header-avatar.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+img.header-avatar {
+  object-fit: cover;
+  background: var(--bg-elevated);
+}
+
 .avatar-fallback {
   display: flex;
   align-items: center;
@@ -222,6 +253,82 @@ input {
   color: var(--text);
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.header-avatar.avatar-fallback {
+  background: var(--bg-elevated);
+  font-size: 0.62rem;
+}
+
+.header-account-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.header-account-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-account-menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 200;
+  min-width: 12.5rem;
+  padding: 0.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.header-account-menu.is-hidden {
+  display: none;
+}
+
+.header-account-identity {
+  padding: 0.45rem 0.55rem 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.35rem;
+}
+
+.header-account-name {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.header-account-email {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  word-break: break-all;
+}
+
+.header-account-action {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.header-account-action:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.header-account-action-muted {
+  color: rgba(255, 255, 255, 0.65);
 }
 
 /* Main */
@@ -694,12 +801,30 @@ input {
   margin-bottom: 0.75rem;
 }
 
+.stats-origin-map-viewport {
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stats-origin-map-viewport.is-panning {
+  cursor: grabbing;
+}
+
 .stats-origin-map-svg {
   display: block;
   width: 100%;
   height: auto;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  background: transparent;
+}
+
+.stats-origin-map-viewport .stats-origin-map-svg {
+  border-radius: 0;
 }
 
 .stats-origin-map-svg path {
@@ -2780,19 +2905,14 @@ input {
 
   .btn-pin-header,
   .btn-icon,
-  .btn-reorder-header {
+  .btn-reorder-header,
+  .header-account-btn {
     width: 2.5rem;
     height: 2rem;
   }
 
   .btn-icon {
     font-size: 1.1rem;
-  }
-
-  .avatar,
-  .avatar-fallback {
-    width: 40px;
-    height: 40px;
   }
 
   .main {
