@@ -46,6 +46,17 @@ export function displayName(recipe) {
   );
 }
 
+/** Optional short label for the home screen tile only. */
+export function recipeBlendBrief(recipe) {
+  return String(recipe?.blendBrief ?? '').trim();
+}
+
+export function displayHomeTileName(recipe) {
+  const brief = recipeBlendBrief(recipe);
+  if (brief) return brief;
+  return displayName(recipe);
+}
+
 export function displaySubtitle(recipe) {
   const roaster = recipe.roaster?.trim();
   if (roaster && roaster !== displayName(recipe)) return roaster;
@@ -141,6 +152,7 @@ export function resolvePresetValue(preset, custom) {
 export function beanFieldsFromRecipe(recipe) {
   return {
     blend: recipeBlend(recipe),
+    blendBrief: recipeBlendBrief(recipe),
     roaster: recipe.roaster || '',
     farmer: recipeFarmer(recipe),
     origin: recipe.origin || '',

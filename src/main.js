@@ -15,7 +15,9 @@ import {
 } from './api.js';
 import {
   displayName,
+  displayHomeTileName,
   displaySubtitle,
+  recipeBlendBrief,
   displayMethodName,
   recipeBlend,
   recipeFarmer,
@@ -573,7 +575,7 @@ function renderCoffeeTile(r, index = 0) {
   return `
     <button type="button" class="tile" data-id="${escapeHtml(r.id)}" draggable="${view.reorderMode ? 'true' : 'false'}">
       <div class="tile-header">
-        <h2 class="tile-name">${escapeHtml(displayName(r))}</h2>
+        <h2 class="tile-name">${escapeHtml(displayHomeTileName(r))}</h2>
         ${displaySubtitle(r) ? `<p class="tile-sub">${escapeHtml(displaySubtitle(r))}</p>` : ''}
         ${decafIcon}
       </div>
@@ -2057,6 +2059,15 @@ function renderPanelEdit(recipe) {
                   <span>Blend</span>
                   <input type="text" name="coffeeBlend" value="${escapeHtml(recipeBlend(recipe))}" placeholder="e.g. Nosegrind" />
                 </label>
+                <label class="edit-field edit-field-span-2">
+                  <span>Blend (brief)</span>
+                  <input
+                    type="text"
+                    name="coffeeBlendBrief"
+                    value="${escapeHtml(recipeBlendBrief(recipe))}"
+                    placeholder="Optional short title for home tile"
+                  />
+                </label>
                 <label class="edit-field">
                   <span>Roaster</span>
                   <input type="text" name="coffeeRoaster" value="${escapeHtml(recipe.roaster || '')}" placeholder="e.g. LOT61" />
@@ -2235,6 +2246,10 @@ function renderAddForm() {
               <label class="edit-field">
                 <span>Blend</span>
                 <input type="text" name="blend" data-bean-field placeholder="e.g. Nosegrind" />
+              </label>
+              <label class="edit-field edit-field-span-2">
+                <span>Blend (brief)</span>
+                <input type="text" name="blendBrief" data-bean-field placeholder="Optional short title for home tile" />
               </label>
               <label class="edit-field">
                 <span>Roaster</span>
@@ -3072,6 +3087,7 @@ function bindPanelEdit(recipe) {
 
     const coffeeUpdates = {};
     const coffeeBlend = String(fd.get('coffeeBlend') ?? '').trim();
+    const coffeeBlendBrief = String(fd.get('coffeeBlendBrief') ?? '').trim();
     const coffeeRoaster = String(fd.get('coffeeRoaster') ?? '').trim();
     const coffeeFarmer = String(fd.get('coffeeFarmer') ?? '').trim();
     const coffeeOrigin = String(fd.get('coffeeOrigin') ?? '').trim();
@@ -3080,6 +3096,7 @@ function bindPanelEdit(recipe) {
     const coffeeRoastType = String(fd.get('coffeeRoastType') ?? '').trim();
     const coffeeRoasterUrl = normalizeRoasterUrl(fd.get('coffeeRoasterUrl'));
     coffeeUpdates.blend = coffeeBlend;
+    coffeeUpdates.blendBrief = coffeeBlendBrief;
     coffeeUpdates.roaster = coffeeRoaster;
     coffeeUpdates.farmer = coffeeFarmer;
     coffeeUpdates.origin = coffeeOrigin;
@@ -3386,6 +3403,7 @@ function bindAddForm() {
 
     const beanData = {
       blend: String(fd.get('blend') ?? '').trim(),
+      blendBrief: String(fd.get('blendBrief') ?? '').trim(),
       roaster: String(fd.get('roaster') ?? '').trim(),
       farmer: String(fd.get('farmer') ?? '').trim(),
       origin: String(fd.get('origin') ?? '').trim(),

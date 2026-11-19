@@ -92,12 +92,14 @@ export async function fetchRecipe(uid, recipeId) {
 
 export async function createRecipe(uid, data) {
   const blend = data.blend || '';
+  const blendBrief = String(data.blendBrief ?? '').trim();
   const roaster = data.roaster || '';
   const farmer = data.farmer || '';
   const name = generateCoffeeName({ blend, roaster, farmer });
   const payload = {
     name,
     blend,
+    ...(blendBrief ? { blendBrief } : {}),
     roaster,
     farmer,
     roasterUrl: data.roasterUrl || '',
