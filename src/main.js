@@ -439,18 +439,28 @@ function syncPanelHeroPatternAlign() {
 
   if (!tile) {
     hero.style.removeProperty('--hero-text-col');
+  } else {
+    const heroRect = hero.getBoundingClientRect();
+    const tilePatternX = tile.left + tile.width * TILE_PATTERN_START_RATIO;
+    let textCol = Math.round(tilePatternX - heroRect.left);
+
+    const minCol = 56;
+    const maxCol = Math.round(heroRect.width * 0.5);
+    textCol = Math.max(minCol, Math.min(textCol, maxCol));
+
+    hero.style.setProperty('--hero-text-col', `${textCol}px`);
+  }
+
+  const heroTop = hero.getBoundingClientRect().top;
+  const methodTabEls = [...document.querySelectorAll('#panel-method-tabs .method-tab')];
+  if (!methodTabEls.length) {
+    hero.style.removeProperty('--panel-pattern-height');
     return;
   }
 
-  const heroRect = hero.getBoundingClientRect();
-  const tilePatternX = tile.left + tile.width * TILE_PATTERN_START_RATIO;
-  let textCol = Math.round(tilePatternX - heroRect.left);
-
-  const minCol = 56;
-  const maxCol = Math.round(heroRect.width * 0.5);
-  textCol = Math.max(minCol, Math.min(textCol, maxCol));
-
-  hero.style.setProperty('--hero-text-col', `${textCol}px`);
+  const methodBottom = Math.max(...methodTabEls.map((tab) => tab.getBoundingClientRect().bottom));
+  const height = Math.max(hero.offsetHeight, Math.floor(methodBottom - heroTop));
+  hero.style.setProperty('--panel-pattern-height', `${height}px`);
 }
 
 function prefersReducedPanelMotion() {
@@ -617,6 +627,8 @@ function equalizeRecipePanelTabs() {
     tab.style.minWidth = `${maxWidth}px`;
     tab.style.minHeight = `${maxHeight}px`;
   });
+
+  syncPanelHeroPatternAlign();
 }
 
 function render() {
@@ -2158,11 +2170,11 @@ function renderDetailPanel() {
     : { label: drink.gear || 'Grinder', value: drink.grind || '—' };
   const grinderLabel = grinderStat.label;
   const grinderValue = grinderStat.value;
+  const menuOpenClass = view.panel.menuOpen ? ' is-panel-menu-open' : '';
 
   return wrapRecipePanelBackdrop(`
-      <div class="recipe-panel recipe-panel-view recipe-panel-view--tile-hero" role="dialog">
+      <div class="recipe-panel recipe-panel-view recipe-panel-view--tile-hero${menuOpenClass}" role="dialog">
         ${renderPanelHeader(recipe, drink, { showTabReorder, tabReorderMode })}
-
         ${tabReorderHint}
         ${methodTabs}
         ${drinkTabs}
@@ -2260,8 +2272,7 @@ function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMo
       <div class="panel-hero-actions panel-actions">${actions}</div>
       <div class="panel-hero-main">
         <div class="panel-hero-text">
-          <h2 class="panel-hero-title">${escapeHtml(displayHomeTileName(recipe))}</h2>
-          ${subtitle ? `<p class="panel-hero-sub">${escapeHtml(subtitle)}</p>` : ''}
+          <h2 class="panel-hero-title">${escapeHtml(displayName(recipe))}</h2>
           <div class="panel-hero-stars">${renderStars(rating)}</div>
         </div>
         <div class="panel-hero-pattern tile-pattern" style="${tilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
