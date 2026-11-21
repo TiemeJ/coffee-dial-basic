@@ -379,6 +379,10 @@ function getRecipe(id) {
   return recipes.find((r) => r.id === id) || allRecipes.find((r) => r.id === id);
 }
 
+const RECIPE_PANEL_MOTION_MS = 460;
+
+let recipePanelEnterPending = false;
+
 function openPanel(recipeId, methodName = null, drinkName = null, editing = false) {
   const recipe = getRecipe(recipeId);
   const { activeMethod, activeDrink } = resolveVisibleSelection(recipe, methodName, drinkName);
@@ -391,6 +395,83 @@ function openPanel(recipeId, methodName = null, drinkName = null, editing = fals
     menuOpen: false,
     tabReorderMode: false,
   };
+  recipePanelEnterPending = true;
+}
+
+function prefersReducedPanelMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function wrapRecipePanelBackdrop(content) {
+  const motionClass = recipePanelEnterPending
+    ? 'is-enter-pending'
+    : 'is-open recipe-panel--no-motion';
+  return `<div class="panel-backdrop panel-backdrop-recipe ${motionClass}" id="panel-backdrop">${content}</div>`;
+}
+
+function playRecipePanelEnter() {
+  const backdrop = document.getElementById('panel-backdrop');
+  if (!backdrop?.classList.contains('panel-backdrop-recipe')) return;
+
+  if (prefersReducedPanelMotion()) {
+    backdrop.classList.remove('is-enter-pending');
+    backdrop.classList.add('is-open');
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      backdrop.classList.remove('is-enter-pending');
+      backdrop.classList.add('is-open');
+    });
+  });
+}
+
+function bindRecipePanelMotion() {
+  const backdrop = document.getElementById('panel-backdrop');
+  if (!backdrop?.classList.contains('panel-backdrop-recipe')) return;
+
+  if (recipePanelEnterPending) {
+    recipePanelEnterPending = false;
+    playRecipePanelEnter();
+    return;
+  }
+
+  backdrop.classList.remove('is-enter-pending');
+  backdrop.classList.add('is-open');
+}
+
+function dismissRecipePanel(onDismissed) {
+  const backdrop = document.getElementById('panel-backdrop');
+  if (
+    !backdrop?.classList.contains('panel-backdrop-recipe') ||
+    prefersReducedPanelMotion() ||
+    backdrop.classList.contains('is-closing')
+  ) {
+    onDismissed();
+    return;
+  }
+
+  backdrop.classList.add('is-closing');
+  backdrop.classList.remove('is-open');
+  backdrop.classList.remove('recipe-panel--no-motion');
+
+  const panel = backdrop.querySelector('.recipe-panel');
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    panel?.removeEventListener('transitionend', onTransitionEnd);
+    clearTimeout(fallback);
+    onDismissed();
+  };
+  const onTransitionEnd = (event) => {
+    if (event.target !== panel || event.propertyName !== 'transform') return;
+    finish();
+  };
+
+  panel?.addEventListener('transitionend', onTransitionEnd);
+  const fallback = setTimeout(finish, RECIPE_PANEL_MOTION_MS + 80);
 }
 
 function renderPresetField({ label, presetName, customName, readonlyName, options, value, placeholder, editable }) {
@@ -1918,16 +1999,14 @@ function renderDetailPanel() {
     : '';
 
   if (!activeMethod || !drink) {
-    return `
-      <div class="panel-backdrop" id="panel-backdrop">
+    return wrapRecipePanelBackdrop(`
         <div class="recipe-panel" role="dialog">
           ${renderPanelHeader(recipe, null)}
           <div class="panel-empty">
             <p>No recipes saved yet.</p>
             <button type="button" class="btn btn-primary" id="btn-start-edit">Add first recipe</button>
           </div>
-        </div>
-      </div>`;
+        </div>`);
   }
 
   const ratio = formatRatio(drink);
@@ -1937,8 +2016,7 @@ function renderDetailPanel() {
   const grinderLabel = grinderStat.label;
   const grinderValue = grinderStat.value;
 
-  return `
-    <div class="panel-backdrop" id="panel-backdrop">
+  return wrapRecipePanelBackdrop(`
       <div class="recipe-panel recipe-panel-view" role="dialog">
         ${renderPanelHeader(recipe, drink, { showTabReorder, tabReorderMode })}
 
@@ -1994,9 +2072,7 @@ function renderDetailPanel() {
           </details>
         </div>
         </div>
-      </div>
-    </div>
-  `;
+      </div>`);
 }
 
 function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMode = false } = {}) {
@@ -2071,8 +2147,7 @@ function renderPanelEdit(recipe) {
     addMode === 'method' ? 'Add method' : addMode === 'drink' ? 'Add drink' : 'Edit recipe';
   const extractionOpen = addMode === 'method' || addMode === 'drink';
 
-  return `
-    <div class="panel-backdrop" id="panel-backdrop">
+  return wrapRecipePanelBackdrop(`
       <div class="recipe-panel recipe-panel-edit" role="dialog">
         <header class="edit-topbar">
           <h2 class="edit-topbar-title">
@@ -2237,8 +2312,7 @@ function renderPanelEdit(recipe) {
             </div>
           </footer>
         </form>
-      </div>
-    </div>`;
+      </div>`);
 }
 
 function renderAddForm() {
@@ -2921,16 +2995,22 @@ function bindDetailPanel() {
   const recipe = getRecipe(view.panel.recipeId);
   if (!recipe) return;
 
+  bindRecipePanelMotion();
+
   document.getElementById('panel-backdrop')?.addEventListener('click', (e) => {
     if (e.target.id === 'panel-backdrop') {
-      view.panel = null;
-      render();
+      dismissRecipePanel(() => {
+        view.panel = null;
+        render();
+      });
     }
   });
 
   document.getElementById('btn-close')?.addEventListener('click', () => {
-    view.panel = null;
-    render();
+    dismissRecipePanel(() => {
+      view.panel = null;
+      render();
+    });
   });
 
   document.getElementById('btn-panel-tab-reorder')?.addEventListener('click', async () => {
@@ -2973,12 +3053,14 @@ function bindDetailPanel() {
       }
 
       if (action === 'edit-pin') {
-        view.panel = null;
-        view.pinFlow = pinFlowPreserveState({
-          step: 'configure',
-          recipeId: recipe.id,
+        dismissRecipePanel(() => {
+          view.panel = null;
+          view.pinFlow = pinFlowPreserveState({
+            step: 'configure',
+            recipeId: recipe.id,
+          });
+          render();
         });
-        render();
         return;
       }
 
@@ -3001,8 +3083,10 @@ function bindDetailPanel() {
 
       if (action === 'unpin') {
         await unpinRecipeFromHome(recipe);
-        view.panel = null;
-        render();
+        dismissRecipePanel(() => {
+          view.panel = null;
+          render();
+        });
         return;
       }
     });

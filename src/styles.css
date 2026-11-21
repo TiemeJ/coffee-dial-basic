@@ -361,6 +361,17 @@ img.header-avatar {
   background: var(--bg-header);
   border: 1px solid rgba(0, 0, 0, 0.15);
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, scale 0.25s ease, rotate 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.tile:focus {
+  outline: none;
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .tiles-reorder-mode .tile {
@@ -1762,6 +1773,101 @@ img.header-avatar {
   backdrop-filter: blur(4px);
 }
 
+.panel-backdrop.panel-backdrop-recipe {
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  /* Open timing ×3 for review (revert to ~0.32s when done) */
+  transition:
+    background 0.96s ease,
+    backdrop-filter 0.96s ease,
+    -webkit-backdrop-filter 0.96s ease;
+}
+
+.panel-backdrop.panel-backdrop-recipe.is-open {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.panel-backdrop.panel-backdrop-recipe.is-closing {
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  transition:
+    background 0.32s ease,
+    backdrop-filter 0.32s ease,
+    -webkit-backdrop-filter 0.32s ease;
+}
+
+.panel-backdrop.panel-backdrop-recipe .recipe-panel {
+  opacity: 0;
+  transform: translate3d(0, 1rem, 0) scale(0.98);
+  will-change: transform, opacity;
+}
+
+.panel-backdrop.panel-backdrop-recipe.is-open .recipe-panel {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  /* Open timing ×3 for review */
+  transition:
+    transform 1.08s cubic-bezier(0.34, 1.28, 0.64, 1),
+    opacity 0.78s ease;
+}
+
+.panel-backdrop.panel-backdrop-recipe.is-closing .recipe-panel {
+  opacity: 0;
+  transform: translate3d(0, 0.75rem, 0) scale(0.98);
+  animation: none;
+  transition:
+    transform 0.28s cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 0.22s ease;
+}
+
+@keyframes recipe-sheet-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  58% {
+    opacity: 1;
+    transform: translate3d(0, -2.4%, 0);
+  }
+  74% {
+    transform: translate3d(0, 1.1%, 0);
+  }
+  87% {
+    transform: translate3d(0, -0.35%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.panel-backdrop.panel-backdrop-recipe.recipe-panel--no-motion,
+.panel-backdrop.panel-backdrop-recipe.recipe-panel--no-motion .recipe-panel {
+  transition: none;
+}
+
+.panel-backdrop.panel-backdrop-recipe.recipe-panel--no-motion .recipe-panel {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-backdrop.panel-backdrop-recipe,
+  .panel-backdrop.panel-backdrop-recipe .recipe-panel {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .panel-backdrop.panel-backdrop-recipe.is-enter-pending .recipe-panel {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .recipe-panel {
   background: var(--bg-elevated);
   border-radius: 20px;
@@ -2959,6 +3065,25 @@ img.header-avatar {
   .panel-backdrop {
     padding: 0;
     align-items: flex-end;
+  }
+
+  .panel-backdrop.panel-backdrop-recipe .recipe-panel {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  .panel-backdrop.panel-backdrop-recipe.is-open:not(.recipe-panel--no-motion) .recipe-panel {
+    transform: translate3d(0, 0, 0);
+    transition: none;
+    /* Open timing ×3 for review; slight settle bounce at the end */
+    animation: recipe-sheet-enter 1.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .panel-backdrop.panel-backdrop-recipe.is-closing .recipe-panel {
+    transform: translate3d(0, 100%, 0);
+    animation: none;
+    transition:
+      transform 0.34s cubic-bezier(0.4, 0, 0.65, 1),
+      opacity 0.24s ease;
   }
 
   .recipe-panel,
