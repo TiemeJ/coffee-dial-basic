@@ -1777,11 +1777,10 @@ img.header-avatar {
   background: rgba(0, 0, 0, 0);
   backdrop-filter: blur(0);
   -webkit-backdrop-filter: blur(0);
-  /* Open timing ×3 for review (revert to ~0.32s when done) */
   transition:
-    background 0.96s ease,
-    backdrop-filter 0.96s ease,
-    -webkit-backdrop-filter 0.96s ease;
+    background 0.32s ease,
+    backdrop-filter 0.32s ease,
+    -webkit-backdrop-filter 0.32s ease;
 }
 
 .panel-backdrop.panel-backdrop-recipe.is-open {
@@ -1809,10 +1808,9 @@ img.header-avatar {
 .panel-backdrop.panel-backdrop-recipe.is-open .recipe-panel {
   opacity: 1;
   transform: translate3d(0, 0, 0) scale(1);
-  /* Open timing ×3 for review */
   transition:
-    transform 1.08s cubic-bezier(0.34, 1.28, 0.64, 1),
-    opacity 0.78s ease;
+    transform 0.36s cubic-bezier(0.34, 1.28, 0.64, 1),
+    opacity 0.26s ease;
 }
 
 .panel-backdrop.panel-backdrop-recipe.is-closing .recipe-panel {
@@ -3074,8 +3072,7 @@ img.header-avatar {
   .panel-backdrop.panel-backdrop-recipe.is-open:not(.recipe-panel--no-motion) .recipe-panel {
     transform: translate3d(0, 0, 0);
     transition: none;
-    /* Open timing ×3 for review; slight settle bounce at the end */
-    animation: recipe-sheet-enter 1.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: recipe-sheet-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
   .panel-backdrop.panel-backdrop-recipe.is-closing .recipe-panel {
