@@ -162,3 +162,14 @@ export async function fetchHomeOrder(uid) {
 export async function saveHomeOrder(uid, order) {
   await setDoc(doc(db, 'users', uid), { homeOrder: order }, { merge: true });
 }
+
+export async function fetchUserPreferences(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists()) return { showSingleDrinkTabs: true };
+  const showSingleDrinkTabs = snap.data().showSingleDrinkTabs;
+  return { showSingleDrinkTabs: showSingleDrinkTabs !== false };
+}
+
+export async function saveUserPreferences(uid, preferences) {
+  await setDoc(doc(db, 'users', uid), preferences, { merge: true });
+}

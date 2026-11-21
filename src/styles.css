@@ -1042,6 +1042,94 @@ img.header-avatar {
   color: rgba(255, 255, 255, 0.35);
 }
 
+.pref-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.pref-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  position: relative;
+}
+
+.pref-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pref-toggle-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pref-toggle-desc {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.pref-toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.pref-toggle-switch {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  margin-top: 0.1rem;
+}
+
+.pref-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.18rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: var(--text-bright);
+  transform: translateY(-50%);
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.pref-toggle-input:checked + .pref-toggle-switch {
+  background: rgba(176, 137, 104, 0.45);
+  border-color: rgba(176, 137, 104, 0.65);
+}
+
+.pref-toggle-input:checked + .pref-toggle-switch::after {
+  transform: translate(1.15rem, -50%);
+}
+
+.pref-toggle-input:focus-visible + .pref-toggle-switch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .grinder-offset-form {
   display: flex;
   flex-direction: column;
@@ -1846,13 +1934,14 @@ img.header-avatar {
 }
 
 .recipe-panel {
+  --recipe-panel-pad-x: 1.2rem;
   background: var(--bg-elevated);
   border-radius: 20px;
   width: 100%;
   max-width: 420px;
   max-height: 90vh;
   overflow-y: auto;
-  padding: 1rem 1.2rem 1.25rem;
+  padding: 1rem var(--recipe-panel-pad-x) 1.25rem;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.06);
   position: relative;
@@ -1919,15 +2008,164 @@ img.header-avatar {
   width: 100%;
 }
 
-.panel-header {
+.recipe-panel-view--tile-hero {
+  padding-top: 0;
+}
+
+.panel-hero {
+  position: relative;
+  z-index: 4;
+  margin: -1rem -1.2rem 0.85rem;
+  border-radius: 20px 20px 0 12px;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.panel-hero-main {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--hero-text-col, 33.333%) minmax(0, 1fr);
+  column-gap: 0;
+  align-items: stretch;
+  min-height: 56px;
+  background: var(--bg-header);
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.panel-hero-text {
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  padding-right: 0.4rem;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.recipe-panel-view--tile-hero .panel-hero-text {
+  padding-left: var(--recipe-panel-pad-x);
+}
+
+.panel-hero-main .panel-hero-pattern.tile-pattern {
+  min-width: 0;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.45) 22%,
+    #000 48%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.45) 22%,
+    #000 48%,
+    #000 100%
+  );
+}
+
+.panel-hero-main .panel-hero-pattern.tile-pattern::after {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.panel-hero-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-hero-sub {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 0.08rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-hero-stars {
+  display: flex;
+  gap: 0.08rem;
+  margin-top: 0.15rem;
+  min-height: 11px;
+}
+
+.panel-hero-stars .star {
+  width: 11px;
+  height: 11px;
+}
+
+.panel-hero-text .tile-decaf-icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 0.15rem;
+}
+
+.panel-hero-actions {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.25rem;
+  z-index: 6;
+  gap: 0.15rem;
+}
+
+.panel-hero-actions .panel-action-btn,
+.panel-hero-actions .btn-reorder-header {
+  width: 24px;
+  height: 24px;
+  font-size: 0.9rem;
+}
+
+.panel-hero-actions .btn-reorder-header .reorder-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.panel-hero-actions .panel-action-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.panel-hero-actions .panel-action-btn {
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-bright);
+}
+
+.panel-hero-actions .panel-action-btn:hover {
+  background: transparent;
+  color: var(--text-bright);
+  opacity: 0.82;
+}
+
+.panel-header {
   margin-bottom: 0.75rem;
 }
 
+.panel-title-block {
+  min-width: 0;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
 .panel-title {
+  flex: 1;
+  min-width: 0;
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.2;
@@ -2005,6 +2243,46 @@ img.header-avatar {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.panel-hero-actions.panel-actions .btn-reorder-header {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-bright);
+}
+
+.panel-hero-actions.panel-actions .btn-reorder-header:hover {
+  background: transparent;
+  border: none;
+  color: var(--text-bright);
+  opacity: 0.82;
+}
+
+.panel-hero-actions.panel-actions .btn-reorder-header.btn-reorder-ok {
+  width: 24px;
+  min-width: 24px;
+  padding: 0;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: transparent;
+  border: none;
+  color: var(--accent-hover);
+}
+
+.panel-hero-actions.panel-actions .btn-reorder-header.btn-reorder-ok:hover {
+  background: transparent;
+  border: none;
+  opacity: 0.82;
+}
+
 .panel-tabs-reorder-hint {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -2055,6 +2333,7 @@ img.header-avatar {
 
 .panel-menu-wrap {
   position: relative;
+  z-index: 1;
 }
 
 .panel-menu {
@@ -2066,7 +2345,7 @@ img.header-avatar {
   border: 1px solid rgba(255, 255, 255, 0.08);
   min-width: 160px;
   overflow: hidden;
-  z-index: 10;
+  z-index: 20;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -3065,11 +3344,12 @@ img.header-avatar {
 
   .recipe-panel,
   .pin-panel {
+    --recipe-panel-pad-x: 1rem;
     max-width: 100%;
     max-height: 92vh;
     max-height: 92dvh;
     border-radius: 20px 20px 0 0;
-    padding: 0.85rem 1rem 1rem;
+    padding: 0.85rem var(--recipe-panel-pad-x) 1rem;
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -3084,6 +3364,11 @@ img.header-avatar {
   .recipe-panel-view {
     min-height: 0;
     max-height: 92dvh;
+  }
+
+  .panel-hero {
+    margin: -0.85rem -1rem 0.75rem;
+    border-radius: 20px 20px 0 12px;
   }
 
   .recipe-panel-edit {
@@ -3108,6 +3393,20 @@ img.header-avatar {
   .panel-action-btn {
     width: 40px;
     height: 40px;
+  }
+
+  .panel-hero-actions .panel-action-btn,
+  .panel-hero-actions.panel-actions .btn-reorder-header,
+  .panel-hero-actions.panel-actions .btn-reorder-header.btn-reorder-ok {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+
+  .panel-hero-actions .panel-action-btn svg,
+  .panel-hero-actions .btn-reorder-header .reorder-icon {
+    width: 15px;
+    height: 15px;
   }
 
   .panel-menu {

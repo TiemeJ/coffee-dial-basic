@@ -13,6 +13,8 @@ import {
   ensureUserDoc,
   fetchHomeOrder,
   saveHomeOrder,
+  fetchUserPreferences,
+  saveUserPreferences,
   deleteField,
 } from './api.js';
 import {
@@ -211,11 +213,31 @@ let view = { name: 'home', panel: null, pinFlow: null, reorderMode: false, accou
 let pinVirtualList = null;
 let recipesFetchToken = 0;
 let libraryLoading = false;
+let userPreferences = { showSingleDrinkTabs: true };
+
+function recipeNeedsDrinkTabs(recipe) {
+  return visibleMethodNames(recipe).some(
+    (method) => visibleDrinkNames(recipe, method).length > 1
+  );
+}
+
+function shouldShowDrinkTabs(drinks, tabReorderMode = false) {
+  if (!drinks?.length) return false;
+  if (tabReorderMode) return true;
+  if (userPreferences.showSingleDrinkTabs) return true;
+  return drinks.length > 1;
+}
+
+function shouldRenderDrinkTabRow(recipe, drinks, tabReorderMode = false) {
+  if (!recipeNeedsDrinkTabs(recipe)) return false;
+  return shouldShowDrinkTabs(drinks, tabReorderMode);
+}
 
 onAuthChange(async (user) => {
   currentUser = user;
   if (user) {
     await ensureUserDoc(user.uid, user.displayName);
+    userPreferences = await fetchUserPreferences(user.uid);
     await loadRecipesStaged();
   } else {
     recipesFetchToken += 1;
@@ -223,6 +245,7 @@ onAuthChange(async (user) => {
     recipes = [];
     allRecipes = [];
     homeOrder = [];
+    userPreferences = { showSingleDrinkTabs: true };
     view = { name: 'home', panel: null, pinFlow: null, reorderMode: false };
     render();
   }
@@ -382,10 +405,20 @@ function getRecipe(id) {
 const RECIPE_PANEL_MOTION_MS = 400;
 
 let recipePanelEnterPending = false;
+let pendingPanelTileAlign = null;
+
+const TILE_PATTERN_START_RATIO = 1 / 3;
 
 function openPanel(recipeId, methodName = null, drinkName = null, editing = false) {
   const recipe = getRecipe(recipeId);
   const { activeMethod, activeDrink } = resolveVisibleSelection(recipe, methodName, drinkName);
+  const tileAlignRect = pendingPanelTileAlign
+    ? {
+        left: pendingPanelTileAlign.left,
+        width: pendingPanelTileAlign.width,
+      }
+    : null;
+  pendingPanelTileAlign = null;
   view.panel = {
     recipeId,
     methodName: activeMethod,
@@ -394,8 +427,30 @@ function openPanel(recipeId, methodName = null, drinkName = null, editing = fals
     addMode: null,
     menuOpen: false,
     tabReorderMode: false,
+    tileAlignRect,
   };
   recipePanelEnterPending = true;
+}
+
+function syncPanelHeroPatternAlign() {
+  const tile = view.panel?.tileAlignRect;
+  const hero = document.querySelector('.panel-hero-main');
+  if (!hero) return;
+
+  if (!tile) {
+    hero.style.removeProperty('--hero-text-col');
+    return;
+  }
+
+  const heroRect = hero.getBoundingClientRect();
+  const tilePatternX = tile.left + tile.width * TILE_PATTERN_START_RATIO;
+  let textCol = Math.round(tilePatternX - heroRect.left);
+
+  const minCol = 56;
+  const maxCol = Math.round(heroRect.width * 0.5);
+  textCol = Math.max(minCol, Math.min(textCol, maxCol));
+
+  hero.style.setProperty('--hero-text-col', `${textCol}px`);
 }
 
 function prefersReducedPanelMotion() {
@@ -684,9 +739,25 @@ function tileBackgroundUrl(variant) {
   return `${import.meta.env.BASE_URL}images/Background_tile_${variant}.png`;
 }
 
-function renderCoffeeTile(r, index = 0) {
-  const variant = (index % TILE_BG_COUNT) + 1;
-  const patternStyle = `background-image: url('${tileBackgroundUrl(variant)}')`;
+function tilePatternVariantForRecipe(recipeId) {
+  const homeIndex = recipes.findIndex((r) => r.id === recipeId);
+  if (homeIndex >= 0) return (homeIndex % TILE_BG_COUNT) + 1;
+  const libraryIndex = allRecipes.findIndex((r) => r.id === recipeId);
+  if (libraryIndex >= 0) return (libraryIndex % TILE_BG_COUNT) + 1;
+  let hash = 0;
+  for (let i = 0; i < recipeId.length; i++) {
+    hash = (hash + recipeId.charCodeAt(i)) % TILE_BG_COUNT;
+  }
+  return hash + 1;
+}
+
+function tilePatternInlineStyle(recipeId) {
+  const variant = tilePatternVariantForRecipe(recipeId);
+  return `background-image: url('${tileBackgroundUrl(variant)}')`;
+}
+
+function renderCoffeeTile(r) {
+  const patternStyle = tilePatternInlineStyle(r.id);
   const decafIcon = isDecafCoffee(r)
     ? `<img src="${import.meta.env.BASE_URL}images/decaf_light.png" alt="Decaf" class="tile-decaf-icon" width="18" height="18" />`
     : '';
@@ -702,7 +773,7 @@ function renderCoffeeTile(r, index = 0) {
 }
 
 function renderHome() {
-  const tiles = recipes.map((r, index) => renderCoffeeTile(r, index)).join('');
+  const tiles = recipes.map((r) => renderCoffeeTile(r)).join('');
   const reorderClass = view.reorderMode ? ' tiles-reorder-mode' : '';
   const reorderHint = view.reorderMode
     ? '<p class="tiles-reorder-hint">Drag tiles to reorder, then tap OK</p>'
@@ -768,6 +839,11 @@ const PIN_SETTINGS_SCREENS = [
     id: 'grinder-offset',
     title: 'Grinder offset',
     description: 'Shift saved grind numbers after zeroing or cleaning a grinder.',
+  },
+  {
+    id: 'card-display',
+    title: 'Coffee card',
+    description: 'Show drink tabs when a method has only one drink.',
   },
 ];
 
@@ -1088,6 +1164,35 @@ function renderPinGrinderOffsetFlow() {
     </div>`;
 }
 
+function renderPinCardDisplayFlow() {
+  const checked = userPreferences.showSingleDrinkTabs ? 'checked' : '';
+  return `
+    <div class="panel-backdrop" id="pin-backdrop">
+      <div class="pin-panel pin-panel-settings-tools" role="dialog">
+        <header class="pin-header">
+          <div>
+            <h2>Coffee card</h2>
+            <p class="pin-subtitle">Tabs on the home coffee card when you open a recipe.</p>
+          </div>
+          <button type="button" class="panel-action-btn" id="pin-close" title="Close">×</button>
+        </header>
+        <div class="pref-toggle-list">
+          <label class="pref-toggle-row">
+            <span class="pref-toggle-copy">
+              <span class="pref-toggle-title">Show single drink tabs</span>
+              <span class="pref-toggle-desc">When off, the drink row stays hidden if the selected method has only one drink.</span>
+            </span>
+            <input type="checkbox" class="pref-toggle-input" id="pref-show-single-drink-tabs" ${checked} />
+            <span class="pref-toggle-switch" aria-hidden="true"></span>
+          </label>
+        </div>
+        <footer class="stats-footer">
+          <button type="button" class="edit-footer-discard" id="pin-card-display-back">Back to settings</button>
+        </footer>
+      </div>
+    </div>`;
+}
+
 function renderPinStatsFlow() {
   const loading = view.pinFlow.statsLoading || libraryLoading;
   const body = loading
@@ -1278,6 +1383,10 @@ function renderPinFlow() {
 
   if (view.pinFlow.step === 'grinder-offset') {
     return renderPinGrinderOffsetFlow();
+  }
+
+  if (view.pinFlow.step === 'card-display') {
+    return renderPinCardDisplayFlow();
   }
 
   if (view.pinFlow.step === 'list') {
@@ -1561,8 +1670,38 @@ function bindPinFlow() {
             grinderApplying: false,
           });
           render();
+          return;
+        }
+        if (screen === 'card-display') {
+          view.pinFlow = pinFlowPreserveState({ step: 'card-display' });
+          render();
         }
       });
+    });
+
+    return;
+  }
+
+  if (view.pinFlow?.step === 'card-display') {
+    document.getElementById('pin-card-display-back')?.addEventListener('click', () => {
+      view.pinFlow = pinFlowPreserveState({ step: 'settings' });
+      render();
+    });
+
+    document.getElementById('pref-show-single-drink-tabs')?.addEventListener('change', async (e) => {
+      const showSingleDrinkTabs = e.target.checked;
+      userPreferences = { ...userPreferences, showSingleDrinkTabs };
+      if (!currentUser) return;
+      try {
+        await saveUserPreferences(currentUser.uid, { showSingleDrinkTabs });
+      } catch (err) {
+        console.error(err);
+        alert('Could not save preference. Please try again.');
+        userPreferences = await fetchUserPreferences(currentUser.uid);
+        render();
+        return;
+      }
+      if (view.panel) render();
     });
 
     return;
@@ -1976,24 +2115,28 @@ function renderDetailPanel() {
   const drinks = activeMethod ? visibleDrinkNames(recipe, activeMethod) : [];
   const drink = activeMethod && activeDrink ? getDrinkParams(recipe, activeMethod, activeDrink) : null;
   const tabReorderMode = view.panel.tabReorderMode;
-  const showTabReorder = methods.length >= 2 || drinks.length >= 2;
+  const needsDrinkTabRow = recipeNeedsDrinkTabs(recipe);
+  const showDrinkTabRow = shouldRenderDrinkTabRow(recipe, drinks, tabReorderMode);
+  const showTabReorder = methods.length >= 2 || (needsDrinkTabRow && drinks.length >= 2);
 
   const methodTabs = renderTabSlot(methods, activeMethod, 'data-method', 'method-tab', 'method-tabs', {
     listId: 'panel-method-tabs',
     reorderMode: tabReorderMode,
   });
-  const drinkTabs = renderTabSlot(
-    drinks,
-    activeDrink,
-    'data-drink',
-    'drink-tab',
-    'method-tabs drink-tabs',
-    {
-      listId: 'panel-drink-tabs',
-      reorderMode: tabReorderMode,
-      labelFor: (drinkKey) => displayPinnedAwareDrinkLabel(recipe, activeMethod, drinkKey),
-    }
-  );
+  const drinkTabs = showDrinkTabRow
+    ? renderTabSlot(
+        drinks,
+        activeDrink,
+        'data-drink',
+        'drink-tab',
+        'method-tabs drink-tabs',
+        {
+          listId: 'panel-drink-tabs',
+          reorderMode: tabReorderMode,
+          labelFor: (drinkKey) => displayPinnedAwareDrinkLabel(recipe, activeMethod, drinkKey),
+        }
+      )
+    : '';
   const tabReorderHint = tabReorderMode
     ? '<p class="panel-tabs-reorder-hint">Drag methods and drinks to reorder, then tap OK</p>'
     : '';
@@ -2017,7 +2160,7 @@ function renderDetailPanel() {
   const grinderValue = grinderStat.value;
 
   return wrapRecipePanelBackdrop(`
-      <div class="recipe-panel recipe-panel-view" role="dialog">
+      <div class="recipe-panel recipe-panel-view recipe-panel-view--tile-hero" role="dialog">
         ${renderPanelHeader(recipe, drink, { showTabReorder, tabReorderMode })}
 
         ${tabReorderHint}
@@ -2075,10 +2218,7 @@ function renderDetailPanel() {
       </div>`);
 }
 
-function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMode = false } = {}) {
-  const rating = drink?.rating ?? '';
-  const compact = drink != null;
-  const subtitle = displaySubtitle(recipe);
+function renderPanelHeaderActions(recipe, { compact, showTabReorder, tabReorderMode }) {
   const reorderIconUrl = `${import.meta.env.BASE_URL}images/reorder-icon.png`;
   const tabReorderBtn = showTabReorder
     ? tabReorderMode
@@ -2088,31 +2228,56 @@ function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMo
         </button>`
     : '';
   return `
-    <header class="panel-header${compact ? ' panel-header-compact' : ''}">
-      <div class="panel-title-block">
-        <h2 class="panel-title">${escapeHtml(displayName(recipe))}</h2>
-        ${compact ? `<p class="panel-farmer">${subtitle ? escapeHtml(subtitle) : '&nbsp;'}</p>` : subtitle ? `<p class="panel-farmer">${escapeHtml(subtitle)}</p>` : ''}
-        ${compact ? `<div class="panel-stars">${renderStars(rating)}</div>` : rating !== '' && rating != null ? `<div class="panel-stars">${renderStars(rating)}</div>` : ''}
-      </div>
-      <div class="panel-actions">
-        ${tabReorderBtn}
-        <div class="panel-menu-wrap">
-          <button type="button" class="panel-action-btn" id="btn-menu" title="More">⋯</button>
-          ${
-            view.panel.menuOpen
-              ? `<div class="panel-menu" id="panel-menu">
-              ${compact ? '<button type="button" data-menu="edit-drink">Edit recipe</button>' : ''}
-              <button type="button" data-menu="add-method">Add method</button>
-              <button type="button" data-menu="add-drink">Add drink</button>
-              <button type="button" data-menu="edit-pin">Edit pin</button>
-              <button type="button" data-menu="unpin">Unpin coffee</button>
-            </div>`
-              : ''
-          }
+    ${tabReorderBtn}
+    <div class="panel-menu-wrap">
+      <button type="button" class="panel-action-btn" id="btn-menu" title="More">⋯</button>
+      ${
+        view.panel.menuOpen
+          ? `<div class="panel-menu" id="panel-menu">
+          ${compact ? '<button type="button" data-menu="edit-drink">Edit recipe</button>' : ''}
+          <button type="button" data-menu="add-method">Add method</button>
+          <button type="button" data-menu="add-drink">Add drink</button>
+          <button type="button" data-menu="edit-pin">Edit pin</button>
+          <button type="button" data-menu="unpin">Unpin coffee</button>
+        </div>`
+          : ''
+      }
+    </div>
+    <button type="button" class="panel-action-btn" id="btn-close" title="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>`;
+}
+
+function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMode = false } = {}) {
+  const rating = drink?.rating ?? '';
+  const compact = drink != null;
+  const subtitle = displaySubtitle(recipe);
+  const actions = renderPanelHeaderActions(recipe, { compact, showTabReorder, tabReorderMode });
+
+  if (compact) {
+    return `
+    <header class="panel-hero">
+      <div class="panel-hero-actions panel-actions">${actions}</div>
+      <div class="panel-hero-main">
+        <div class="panel-hero-text">
+          <h2 class="panel-hero-title">${escapeHtml(displayHomeTileName(recipe))}</h2>
+          ${subtitle ? `<p class="panel-hero-sub">${escapeHtml(subtitle)}</p>` : ''}
+          <div class="panel-hero-stars">${renderStars(rating)}</div>
         </div>
-        <button type="button" class="panel-action-btn" id="btn-close" title="Close">
-          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
+        <div class="panel-hero-pattern tile-pattern" style="${tilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
+      </div>
+    </header>`;
+  }
+
+  return `
+    <header class="panel-header">
+      <div class="panel-title-block">
+        <div class="panel-title-row">
+          <h2 class="panel-title">${escapeHtml(displayName(recipe))}</h2>
+          <div class="panel-actions">${actions}</div>
+        </div>
+        ${subtitle ? `<p class="panel-farmer">${escapeHtml(subtitle)}</p>` : ''}
+        ${rating !== '' && rating != null ? `<div class="panel-stars">${renderStars(rating)}</div>` : ''}
       </div>
     </header>`;
 }
@@ -2679,6 +2844,7 @@ function bindHome() {
         return;
       }
       const id = el.dataset.id;
+      pendingPanelTileAlign = el.getBoundingClientRect();
       const fresh = await fetchRecipe(currentUser.uid, id);
       if (fresh) {
         const allIdx = allRecipes.findIndex((r) => r.id === id);
@@ -2996,6 +3162,13 @@ function bindDetailPanel() {
   if (!recipe) return;
 
   bindRecipePanelMotion();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncPanelHeroPatternAlign();
+    });
+  });
+  setTimeout(syncPanelHeroPatternAlign, RECIPE_PANEL_MOTION_MS + 40);
 
   document.getElementById('panel-backdrop')?.addEventListener('click', (e) => {
     if (e.target.id === 'panel-backdrop') {
