@@ -1778,9 +1778,9 @@ img.header-avatar {
   backdrop-filter: blur(0);
   -webkit-backdrop-filter: blur(0);
   transition:
-    background 0.32s ease,
-    backdrop-filter 0.32s ease,
-    -webkit-backdrop-filter 0.32s ease;
+    background 0.26s ease,
+    backdrop-filter 0.26s ease,
+    -webkit-backdrop-filter 0.26s ease;
 }
 
 .panel-backdrop.panel-backdrop-recipe.is-open {
@@ -1794,9 +1794,9 @@ img.header-avatar {
   backdrop-filter: blur(0);
   -webkit-backdrop-filter: blur(0);
   transition:
-    background 0.32s ease,
-    backdrop-filter 0.32s ease,
-    -webkit-backdrop-filter 0.32s ease;
+    background 0.26s ease,
+    backdrop-filter 0.26s ease,
+    -webkit-backdrop-filter 0.26s ease;
 }
 
 .panel-backdrop.panel-backdrop-recipe .recipe-panel {
@@ -1804,8 +1804,8 @@ img.header-avatar {
   transform: translate3d(0, 1rem, 0) scale(0.98);
   will-change: transform, opacity;
   transition:
-    transform 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.26s ease-out;
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease-out;
 }
 
 .panel-backdrop.panel-backdrop-recipe.is-open .recipe-panel {
@@ -1818,8 +1818,8 @@ img.header-avatar {
   transform: translate3d(0, 0.75rem, 0) scale(0.98);
   animation: none;
   transition:
-    transform 0.28s cubic-bezier(0.4, 0, 0.6, 1),
-    opacity 0.22s ease;
+    transform 0.24s cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 0.18s ease;
 }
 
 .panel-backdrop.panel-backdrop-recipe.recipe-panel--no-motion,
@@ -3047,8 +3047,8 @@ img.header-avatar {
   .panel-backdrop.panel-backdrop-recipe .recipe-panel {
     transform: translate3d(0, 100%, 0);
     transition:
-      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 0.32s ease-out;
+      transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.26s ease-out;
   }
 
   .panel-backdrop.panel-backdrop-recipe.is-open .recipe-panel {
@@ -3059,8 +3059,8 @@ img.header-avatar {
     transform: translate3d(0, 100%, 0);
     animation: none;
     transition:
-      transform 0.34s cubic-bezier(0.4, 0, 0.65, 1),
-      opacity 0.24s ease;
+      transform 0.28s cubic-bezier(0.4, 0, 0.65, 1),
+      opacity 0.2s ease;
   }
 
   .recipe-panel,

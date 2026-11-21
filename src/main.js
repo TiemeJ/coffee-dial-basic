@@ -379,7 +379,7 @@ function getRecipe(id) {
   return recipes.find((r) => r.id === id) || allRecipes.find((r) => r.id === id);
 }
 
-const RECIPE_PANEL_MOTION_MS = 460;
+const RECIPE_PANEL_MOTION_MS = 400;
 
 let recipePanelEnterPending = false;
 
