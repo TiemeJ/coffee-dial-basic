@@ -1823,21 +1823,23 @@ img.header-avatar {
 }
 
 @keyframes recipe-sheet-enter {
-  0% {
+  from {
     opacity: 0;
     transform: translate3d(0, 100%, 0);
+    animation-timing-function: cubic-bezier(0.22, 0.94, 0.28, 1);
   }
-  58% {
+  44% {
     opacity: 1;
-    transform: translate3d(0, -2.4%, 0);
   }
-  74% {
-    transform: translate3d(0, 1.1%, 0);
+  68% {
+    transform: translate3d(0, 0, 0);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
   }
-  87% {
-    transform: translate3d(0, -0.35%, 0);
+  84% {
+    transform: translate3d(0, -0.45%, 0);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
   }
-  100% {
+  to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
@@ -3072,7 +3074,7 @@ img.header-avatar {
   .panel-backdrop.panel-backdrop-recipe.is-open:not(.recipe-panel--no-motion) .recipe-panel {
     transform: translate3d(0, 0, 0);
     transition: none;
-    animation: recipe-sheet-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: recipe-sheet-enter 0.48s forwards;
   }
 
   .panel-backdrop.panel-backdrop-recipe.is-closing .recipe-panel {
