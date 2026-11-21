@@ -2055,13 +2055,51 @@ img.header-avatar {
   z-index: 5;
 }
 
+.recipe-panel-view--tile-hero .brew-stats {
+  background: #1f1c1a;
+}
+
+.recipe-panel-view--tile-hero .stat-card {
+  background: #2a2725;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.recipe-panel-view--tile-hero .note-box {
+  background: #1f1c1a;
+}
+
+.recipe-panel-view--tile-hero .note-box-head:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recipe-panel-view--tile-hero .note-box-body {
+  background: #1f1c1a;
+}
+
 .recipe-panel-view--tile-hero.is-panel-menu-open .panel-hero {
   z-index: 12;
+}
+
+.recipe-panel-view--tile-hero.is-panel-menu-open .panel-hero-actions {
+  z-index: 25;
+}
+
+.recipe-panel-view--tile-hero.is-panel-menu-open .panel-menu {
+  z-index: 30;
+}
+
+.recipe-panel-view--tile-hero:not(.is-panel-menu-open) .panel-hero {
+  z-index: 3;
+}
+
+.recipe-panel-view--tile-hero .panel-hero-main {
+  background: transparent;
 }
 
 .panel-hero {
   position: relative;
   z-index: 4;
+  isolation: isolate;
   margin: -1rem -1.2rem 0.85rem;
   border-radius: 20px 20px 0 12px;
   overflow: visible;
@@ -2070,6 +2108,7 @@ img.header-avatar {
 
 .panel-hero-main {
   position: relative;
+  z-index: 0;
   display: block;
   min-height: 56px;
   background: var(--bg-header);
@@ -2077,28 +2116,59 @@ img.header-avatar {
   overflow: visible;
 }
 
-.panel-hero-main .panel-hero-pattern.tile-pattern {
+.recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern {
   position: absolute;
-  top: 0;
+  top: var(--panel-pattern-top, 0);
+  left: 0;
   right: 0;
-  left: var(--hero-text-col, 33.333%);
   height: var(--panel-pattern-height, 100%);
-  min-height: 100%;
+  min-height: 0;
   min-width: 0;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
+  background-repeat: repeat;
+  background-position: left top;
   -webkit-mask-image:
-    linear-gradient(to bottom, #000 0%, #000 62%, rgba(0, 0, 0, 0.45) 82%, transparent 100%),
-    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.45) 22%, #000 48%, #000 100%);
+    linear-gradient(
+      to top right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.3) 34%,
+      rgba(0, 0, 0, 0.65) 62%,
+      #000 90%,
+      #000 100%
+    ),
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.4) 26%,
+      rgba(0, 0, 0, 0.7) 48%,
+      #000 64%,
+      #000 100%
+    );
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(to bottom, #000 0%, #000 62%, rgba(0, 0, 0, 0.45) 82%, transparent 100%),
-    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.45) 22%, #000 48%, #000 100%);
+    linear-gradient(
+      to top right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.3) 34%,
+      rgba(0, 0, 0, 0.65) 62%,
+      #000 90%,
+      #000 100%
+    ),
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0, 0, 0, 0.4) 26%,
+      rgba(0, 0, 0, 0.7) 48%,
+      #000 64%,
+      #000 100%
+    );
   mask-composite: intersect;
-  border-top-right-radius: 20px;
+  border-radius: 20px 20px 0 12px;
+  overflow: hidden;
 }
 
-.panel-hero-main .panel-hero-pattern.tile-pattern::after {
+.recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern::after {
   background: rgba(0, 0, 0, 0.62);
 }
 
@@ -2157,7 +2227,8 @@ img.header-avatar {
   position: absolute;
   top: 0.2rem;
   right: 0.25rem;
-  z-index: 6;
+  z-index: 15;
+  isolation: isolate;
   gap: 0.15rem;
 }
 
@@ -2378,6 +2449,10 @@ img.header-avatar {
 .panel-menu-wrap {
   position: relative;
   z-index: 1;
+}
+
+.recipe-panel-view--tile-hero .panel-menu {
+  z-index: 50;
 }
 
 .panel-menu {

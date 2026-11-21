@@ -408,6 +408,7 @@ let recipePanelEnterPending = false;
 let pendingPanelTileAlign = null;
 
 const TILE_PATTERN_START_RATIO = 1 / 3;
+const TILE_PATTERN_BG_WIDTH = 240;
 
 function openPanel(recipeId, methodName = null, drinkName = null, editing = false) {
   const recipe = getRecipe(recipeId);
@@ -416,6 +417,8 @@ function openPanel(recipeId, methodName = null, drinkName = null, editing = fals
     ? {
         left: pendingPanelTileAlign.left,
         width: pendingPanelTileAlign.width,
+        patternLeft: pendingPanelTileAlign.patternLeft,
+        patternTop: pendingPanelTileAlign.patternTop,
       }
     : null;
   pendingPanelTileAlign = null;
@@ -451,16 +454,52 @@ function syncPanelHeroPatternAlign() {
     hero.style.setProperty('--hero-text-col', `${textCol}px`);
   }
 
-  const heroTop = hero.getBoundingClientRect().top;
-  const methodTabEls = [...document.querySelectorAll('#panel-method-tabs .method-tab')];
-  if (!methodTabEls.length) {
-    hero.style.removeProperty('--panel-pattern-height');
+  const panel = document.querySelector('.recipe-panel-view--tile-hero');
+  const patternHost = panel?.querySelector(':scope > .panel-hero-pattern');
+  if (!panel || !patternHost) {
+    panel?.style.removeProperty('--panel-pattern-top');
+    panel?.style.removeProperty('--panel-pattern-height');
     return;
   }
 
-  const methodBottom = Math.max(...methodTabEls.map((tab) => tab.getBoundingClientRect().bottom));
-  const height = Math.max(hero.offsetHeight, Math.floor(methodBottom - heroTop));
-  hero.style.setProperty('--panel-pattern-height', `${height}px`);
+  const heroHeader = panel.querySelector('.panel-hero');
+  const patternTop = heroHeader?.offsetTop ?? 0;
+  const height = Math.max(
+    heroHeader?.offsetHeight ?? hero.offsetHeight,
+    panel.scrollHeight - patternTop
+  );
+  panel.style.setProperty('--panel-pattern-top', `${patternTop}px`);
+  panel.style.setProperty('--panel-pattern-height', `${Math.floor(height)}px`);
+
+  syncPanelPatternBackgroundPosition();
+}
+
+function tilePatternPhaseOffset(value, period) {
+  return ((value % period) + period) % period;
+}
+
+function syncPanelPatternBackgroundPosition() {
+  const patternEl = document.querySelector('.panel-hero-pattern');
+  if (!patternEl || !view.panel) return;
+
+  const patternRect = patternEl.getBoundingClientRect();
+  const period = TILE_PATTERN_BG_WIDTH;
+  let originLeft;
+
+  const homePattern = document.querySelector(
+    `.tile[data-id="${CSS.escape(view.panel.recipeId)}"] .tile-pattern`
+  );
+  if (homePattern) {
+    originLeft = homePattern.getBoundingClientRect().left;
+  } else if (view.panel.tileAlignRect?.patternLeft != null) {
+    originLeft = view.panel.tileAlignRect.patternLeft;
+  } else {
+    patternEl.style.backgroundPosition = 'left top';
+    return;
+  }
+
+  const bgX = -tilePatternPhaseOffset(patternRect.left - originLeft, period);
+  patternEl.style.backgroundPosition = `${bgX}px 0px`;
 }
 
 function prefersReducedPanelMotion() {
@@ -2174,6 +2213,7 @@ function renderDetailPanel() {
 
   return wrapRecipePanelBackdrop(`
       <div class="recipe-panel recipe-panel-view recipe-panel-view--tile-hero${menuOpenClass}" role="dialog">
+        <div class="panel-hero-pattern tile-pattern" style="${tilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
         ${renderPanelHeader(recipe, drink, { showTabReorder, tabReorderMode })}
         ${tabReorderHint}
         ${methodTabs}
@@ -2275,7 +2315,6 @@ function renderPanelHeader(recipe, drink, { showTabReorder = false, tabReorderMo
           <h2 class="panel-hero-title">${escapeHtml(displayName(recipe))}</h2>
           <div class="panel-hero-stars">${renderStars(rating)}</div>
         </div>
-        <div class="panel-hero-pattern tile-pattern" style="${tilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
       </div>
     </header>`;
   }
@@ -2855,7 +2894,14 @@ function bindHome() {
         return;
       }
       const id = el.dataset.id;
-      pendingPanelTileAlign = el.getBoundingClientRect();
+      const tileRect = el.getBoundingClientRect();
+      const tilePatternRect = el.querySelector('.tile-pattern')?.getBoundingClientRect();
+      pendingPanelTileAlign = {
+        left: tileRect.left,
+        width: tileRect.width,
+        patternLeft: tilePatternRect?.left ?? tileRect.left,
+        patternTop: tilePatternRect?.top ?? tileRect.top,
+      };
       const fresh = await fetchRecipe(currentUser.uid, id);
       if (fresh) {
         const allIdx = allRecipes.findIndex((r) => r.id === id);
@@ -3180,6 +3226,12 @@ function bindDetailPanel() {
     });
   });
   setTimeout(syncPanelHeroPatternAlign, RECIPE_PANEL_MOTION_MS + 40);
+
+  const panelEl = document.querySelector('.recipe-panel-view--tile-hero');
+  panelEl?.addEventListener('scroll', syncPanelHeroPatternAlign, { passive: true });
+  if (panelEl) {
+    new ResizeObserver(() => syncPanelHeroPatternAlign()).observe(panelEl);
+  }
 
   document.getElementById('panel-backdrop')?.addEventListener('click', (e) => {
     if (e.target.id === 'panel-backdrop') {

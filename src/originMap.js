@@ -205,7 +205,9 @@ function originsSignature(origins) {
 
 function fillForCount(count, maxCount) {
   if (!count) return MAP_DEFAULT_FILL;
-  const t = maxCount ? count / maxCount : 1;
+  const ratio = maxCount > 0 ? count / maxCount : 1;
+  // Square-root + floor so a single mention stays clearly visible vs unmapped countries.
+  const t = 0.38 + 0.62 * Math.sqrt(Math.min(1, ratio));
   const r = Math.round(42 + (MAP_ACCENT.r - 42) * t);
   const g = Math.round(37 + (MAP_ACCENT.g - 37) * t);
   const b = Math.round(32 + (MAP_ACCENT.b - 32) * t);
@@ -233,8 +235,13 @@ function applyColors(svg, countryCounts) {
     const iso = isoFromPath(path);
     const count = iso ? countryCounts.get(iso) || 0 : 0;
     path.setAttribute('fill', fillForCount(count, maxCount));
-    path.setAttribute('stroke', MAP_STROKE);
-    path.setAttribute('stroke-width', '0.5');
+    if (count > 0) {
+      path.setAttribute('stroke', `rgba(${MAP_ACCENT.r}, ${MAP_ACCENT.g}, ${MAP_ACCENT.b}, 0.72)`);
+      path.setAttribute('stroke-width', '0.65');
+    } else {
+      path.setAttribute('stroke', MAP_STROKE);
+      path.setAttribute('stroke-width', '0.5');
+    }
   });
 }
 
