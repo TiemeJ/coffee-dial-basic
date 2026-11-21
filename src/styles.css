@@ -2087,20 +2087,14 @@ img.header-avatar {
   min-width: 0;
   z-index: 0;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(0, 0, 0, 0.45) 22%,
-    #000 48%,
-    #000 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(0, 0, 0, 0.45) 22%,
-    #000 48%,
-    #000 100%
-  );
+  -webkit-mask-image:
+    linear-gradient(to bottom, #000 0%, #000 62%, rgba(0, 0, 0, 0.45) 82%, transparent 100%),
+    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.45) 22%, #000 48%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, #000 0%, #000 62%, rgba(0, 0, 0, 0.45) 82%, transparent 100%),
+    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.45) 22%, #000 48%, #000 100%);
+  mask-composite: intersect;
   border-top-right-radius: 20px;
 }
 
