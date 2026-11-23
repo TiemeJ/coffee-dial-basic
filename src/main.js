@@ -457,18 +457,16 @@ function syncPanelHeroPatternAlign() {
   const panel = document.querySelector('.recipe-panel-view--tile-hero');
   const patternHost = panel?.querySelector(':scope > .panel-hero-pattern');
   if (!panel || !patternHost) {
-    panel?.style.removeProperty('--panel-pattern-top');
     panel?.style.removeProperty('--panel-pattern-height');
     return;
   }
 
   const heroHeader = panel.querySelector('.panel-hero');
-  const patternTop = heroHeader?.offsetTop ?? 0;
+  const patternTop = 0;
   const height = Math.max(
     heroHeader?.offsetHeight ?? hero.offsetHeight,
     panel.scrollHeight - patternTop
   );
-  panel.style.setProperty('--panel-pattern-top', `${patternTop}px`);
   panel.style.setProperty('--panel-pattern-height', `${Math.floor(height)}px`);
 
   syncPanelPatternBackgroundPosition();

@@ -2009,7 +2009,12 @@ img.header-avatar {
 }
 
 .recipe-panel-view--tile-hero {
+  --recipe-panel-content-shift: 0.55rem;
   padding-top: 0;
+}
+
+.recipe-panel-view--tile-hero .panel-hero {
+  margin-top: calc(-1rem + var(--recipe-panel-content-shift));
 }
 
 .recipe-panel-view--tile-hero .panel-tab-slot,
@@ -2118,7 +2123,7 @@ img.header-avatar {
 
 .recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern {
   position: absolute;
-  top: var(--panel-pattern-top, 0);
+  top: 0;
   left: 0;
   right: 0;
   height: var(--panel-pattern-height, 100%);
@@ -2234,19 +2239,19 @@ img.header-avatar {
 
 .panel-hero-actions .panel-action-btn,
 .panel-hero-actions .btn-reorder-header {
-  width: 24px;
-  height: 24px;
-  font-size: 0.9rem;
+  width: 28px;
+  height: 28px;
+  font-size: 1.05rem;
 }
 
 .panel-hero-actions .btn-reorder-header .reorder-icon {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 
 .panel-hero-actions .panel-action-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 
 .panel-hero-actions .panel-action-btn {
@@ -2360,9 +2365,9 @@ img.header-avatar {
 
 .panel-hero-actions.panel-actions .btn-reorder-header {
   box-sizing: border-box;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -2381,12 +2386,13 @@ img.header-avatar {
 }
 
 .panel-hero-actions.panel-actions .btn-reorder-header.btn-reorder-ok {
-  width: 24px;
-  min-width: 24px;
-  padding: 0;
-  font-size: 0.5rem;
+  width: auto;
+  min-width: 28px;
+  padding: 0 0.2rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  line-height: 1;
   background: transparent;
   border: none;
   color: var(--accent-hover);
@@ -3490,6 +3496,10 @@ img.header-avatar {
     border-radius: 20px 20px 0 12px;
   }
 
+  .recipe-panel-view--tile-hero .panel-hero {
+    margin-top: calc(-0.85rem + var(--recipe-panel-content-shift, 0.55rem));
+  }
+
   .recipe-panel-edit {
     max-width: 100%;
     max-height: 94dvh;
@@ -3517,15 +3527,15 @@ img.header-avatar {
   .panel-hero-actions .panel-action-btn,
   .panel-hero-actions.panel-actions .btn-reorder-header,
   .panel-hero-actions.panel-actions .btn-reorder-header.btn-reorder-ok {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
   }
 
   .panel-hero-actions .panel-action-btn svg,
   .panel-hero-actions .btn-reorder-header .reorder-icon {
-    width: 15px;
-    height: 15px;
+    width: 17px;
+    height: 17px;
   }
 
   .panel-menu {
