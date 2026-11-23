@@ -1940,6 +1940,7 @@ img.header-avatar {
   width: 100%;
   max-width: 420px;
   max-height: 90vh;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 1rem var(--recipe-panel-pad-x) 1.25rem;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
@@ -1950,9 +1951,8 @@ img.header-avatar {
 .recipe-panel-view {
   display: flex;
   flex-direction: column;
-  min-height: 32rem;
+  min-height: 0;
   max-height: 90vh;
-  overflow-y: auto;
 }
 
 .recipe-panel-view .panel-body {
@@ -2011,6 +2011,13 @@ img.header-avatar {
 .recipe-panel-view--tile-hero {
   --recipe-panel-content-shift: 0.55rem;
   padding-top: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.recipe-panel-view--tile-hero::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .recipe-panel-view--tile-hero .panel-hero {

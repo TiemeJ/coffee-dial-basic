@@ -462,11 +462,12 @@ function syncPanelHeroPatternAlign() {
   }
 
   const heroHeader = panel.querySelector('.panel-hero');
-  const patternTop = 0;
-  const height = Math.max(
-    heroHeader?.offsetHeight ?? hero.offsetHeight,
-    panel.scrollHeight - patternTop
-  );
+  let contentBottom = 0;
+  for (const child of panel.children) {
+    if (child.classList.contains('panel-hero-pattern')) continue;
+    contentBottom = Math.max(contentBottom, child.offsetTop + child.offsetHeight);
+  }
+  const height = Math.max(heroHeader?.offsetHeight ?? hero.offsetHeight, contentBottom);
   panel.style.setProperty('--panel-pattern-height', `${Math.floor(height)}px`);
 
   syncPanelPatternBackgroundPosition();
