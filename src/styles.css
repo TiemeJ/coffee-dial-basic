@@ -2131,9 +2131,10 @@ img.header-avatar {
 .recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern {
   position: absolute;
   top: 0;
-  left: 0;
   right: 0;
-  height: var(--panel-pattern-height, 100%);
+  bottom: 0;
+  left: 0;
+  height: auto;
   min-height: 0;
   min-width: 0;
   z-index: 1;
@@ -2182,6 +2183,13 @@ img.header-avatar {
 
 .recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern::after {
   background: rgba(0, 0, 0, 0.62);
+}
+
+/* Panel: large assets per variant (home tiles still use Background_tile_N.png). */
+.recipe-panel-view--tile-hero > .panel-hero-pattern.tile-pattern--panel-large {
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right top;
 }
 
 .panel-hero-text {

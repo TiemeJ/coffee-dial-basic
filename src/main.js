@@ -455,20 +455,9 @@ function syncPanelHeroPatternAlign() {
   }
 
   const panel = document.querySelector('.recipe-panel-view--tile-hero');
-  const patternHost = panel?.querySelector(':scope > .panel-hero-pattern');
-  if (!panel || !patternHost) {
-    panel?.style.removeProperty('--panel-pattern-height');
+  if (!panel?.querySelector(':scope > .panel-hero-pattern')) {
     return;
   }
-
-  const heroHeader = panel.querySelector('.panel-hero');
-  let contentBottom = 0;
-  for (const child of panel.children) {
-    if (child.classList.contains('panel-hero-pattern')) continue;
-    contentBottom = Math.max(contentBottom, child.offsetTop + child.offsetHeight);
-  }
-  const height = Math.max(heroHeader?.offsetHeight ?? hero.offsetHeight, contentBottom);
-  panel.style.setProperty('--panel-pattern-height', `${Math.floor(height)}px`);
 
   syncPanelPatternBackgroundPosition();
 }
@@ -480,6 +469,11 @@ function tilePatternPhaseOffset(value, period) {
 function syncPanelPatternBackgroundPosition() {
   const patternEl = document.querySelector('.panel-hero-pattern');
   if (!patternEl || !view.panel) return;
+
+  if (patternEl.classList.contains('tile-pattern--panel-large')) {
+    patternEl.style.backgroundPosition = 'right top';
+    return;
+  }
 
   const patternRect = patternEl.getBoundingClientRect();
   const period = TILE_PATTERN_BG_WIDTH;
@@ -804,6 +798,20 @@ function tilePatternVariantForRecipe(recipeId) {
 function tilePatternInlineStyle(recipeId) {
   const variant = tilePatternVariantForRecipe(recipeId);
   return `background-image: url('${tileBackgroundUrl(variant)}')`;
+}
+
+function panelTilePatternVariant(recipeId) {
+  return tilePatternVariantForRecipe(recipeId);
+}
+
+function panelTilePatternInlineStyle(recipeId) {
+  const variant = panelTilePatternVariant(recipeId);
+  const url = `${import.meta.env.BASE_URL}images/Background_tile_${variant}_large.png`;
+  return `background-image: url('${url}')`;
+}
+
+function panelTilePatternClassName() {
+  return ' tile-pattern--panel-large';
 }
 
 function renderCoffeeTile(r) {
@@ -2212,7 +2220,7 @@ function renderDetailPanel() {
 
   return wrapRecipePanelBackdrop(`
       <div class="recipe-panel recipe-panel-view recipe-panel-view--tile-hero${menuOpenClass}" role="dialog">
-        <div class="panel-hero-pattern tile-pattern" style="${tilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
+        <div class="panel-hero-pattern tile-pattern${panelTilePatternClassName()}" style="${panelTilePatternInlineStyle(recipe.id)}" aria-hidden="true"></div>
         ${renderPanelHeader(recipe, drink, { showTabReorder, tabReorderMode })}
         ${tabReorderHint}
         ${methodTabs}
